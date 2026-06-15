@@ -1,0 +1,58 @@
+:root {
+  --bg: #f3ece2;
+  --bg-gradient-a: #f8dcbf;
+  --bg-gradient-b: #cfdcc8;
+  --panel: #fff9f2;
+  --line-soft: #e2d4c6;
+  --line-strong: #c4ac96;
+  --text-primary: #2f2117;
+  --text-muted: #6c5544;
+  --green-deep: #4e7159;
+  --clay: #c86f3a;
+  font-family: "Alegreya Sans", "Trebuchet MS", "Gill Sans", sans-serif;
+  line-height: 1.45;
+  font-weight: 400;
+  color: var(--text-primary);
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: radial-gradient(circle at 25% -10%, var(--bg-gradient-a), transparent 48%),
+    radial-gradient(circle at 80% 10%, var(--bg-gradient-b), transparent 45%),
+    var(--bg);
+}
+
+h1,
+h2,
+h3 {
+  font-family: "Fraunces", "Times New Roman", serif;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+h1 {
+  margin-top: 0.6rem;
+  font-size: clamp(1.8rem, 4vw, 3rem);
+  line-height: 1.1;
+}
+
+h2 {
+  font-size: 1.28rem;
+  margin-bottom: 0.65rem;
+}
+
+h3 {
+  font-size: 1.05rem;
+}
+
+p {
+  margin: 0;
+}
