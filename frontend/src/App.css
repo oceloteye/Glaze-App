@@ -46,12 +46,151 @@
   box-shadow: 0 4px 22px rgba(52, 38, 30, 0.18);
 }
 
+.realistic-preview-canvas {
+  display: block;
+  border-radius: 14px;
+  box-shadow: 0 4px 22px rgba(52, 38, 30, 0.18);
+}
+
+.realistic-3d-wrap {
+  display: grid;
+  gap: 0.35rem;
+  justify-items: center;
+}
+
+.realistic-3d-wrap canvas {
+  width: min(560px, 88vw);
+  height: min(560px, 62vh);
+  border-radius: 14px;
+  border: 1px solid var(--line-soft);
+  background: #efe4d7;
+}
+
+.ai-preview-wrap {
+  border: 1px solid rgba(50, 103, 79, 0.18);
+  border-radius: 16px;
+  padding: 0.5rem 0.55rem 0.7rem;
+  background: linear-gradient(180deg, rgba(248, 243, 236, 0.96), rgba(255, 255, 255, 0.96));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.ai-preview-canvas {
+  display: block;
+  border-radius: 14px;
+  box-shadow: 0 4px 22px rgba(52, 38, 30, 0.18);
+}
+
+.ai-preview-image {
+  display: block;
+  width: 220px;
+  height: 220px;
+  object-fit: cover;
+  border-radius: 14px;
+  box-shadow: 0 4px 22px rgba(52, 38, 30, 0.18);
+}
+
+.ai-preview-tags {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.35rem;
+  margin-top: 0.35rem;
+}
+
+.ai-preview-tag {
+  border: 1px solid rgba(50, 103, 79, 0.18);
+  border-radius: 999px;
+  padding: 0.22rem 0.52rem;
+  font-size: 0.72rem;
+  color: var(--green-deep);
+  background: rgba(98, 150, 118, 0.08);
+}
+
+.preview-actions {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.deterministic-note {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--green-deep);
+  font-weight: 600;
+}
+
+.realism-controls {
+  border: 1px solid var(--line-soft);
+  border-radius: 12px;
+  padding: 0.7rem;
+  background: rgba(255, 255, 255, 0.62);
+}
+
+.realism-controls h3 {
+  margin: 0 0 0.55rem;
+  font-size: 0.92rem;
+}
+
+.ai-modal-note {
+  border: 1px solid rgba(50, 103, 79, 0.14);
+  border-radius: 12px;
+  padding: 0.8rem;
+  background: rgba(98, 150, 118, 0.08);
+}
+
+.realism-grid {
+  display: grid;
+  gap: 0.55rem;
+  grid-template-columns: 1fr;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(33, 24, 18, 0.45);
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  z-index: 1000;
+}
+
+.modal-panel {
+  width: min(720px, 94vw);
+  max-height: 92vh;
+  overflow: auto;
+  background: #fffaf4;
+  border: 1px solid var(--line-soft);
+  border-radius: 16px;
+  box-shadow: 0 20px 48px rgba(22, 14, 10, 0.28);
+  padding: 1rem;
+  display: grid;
+  gap: 0.8rem;
+}
+
+.modal-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.modal-head h3 {
+  margin: 0;
+}
+
 .glaze-preview-caption {
   margin: 0.4rem 0 0;
   font-size: 0.72rem;
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.09em;
+}
+
+.glaze-preview-selected {
+  margin: 0.18rem 0 0;
+  font-size: 0.74rem;
+  color: var(--green-deep);
+  font-weight: 600;
+  text-align: center;
 }
 
 .page-shell {
@@ -112,6 +251,13 @@
   gap: 0.35rem;
   font-size: 0.95rem;
   color: var(--text-muted);
+}
+
+.field-note {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: #6f503e;
 }
 
 .form-panel input,
@@ -260,6 +406,31 @@
   margin: 0.25rem 0 0;
 }
 
+.results-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin: 0.2rem 0 0.8rem;
+  flex-wrap: wrap;
+}
+
+.ghost-btn {
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  padding: 0.5rem 0.75rem;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  background: #fff;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.ghost-btn:hover {
+  background: #f8f1ea;
+  border-color: #d0bca8;
+}
+
 .recipe-list {
   display: grid;
   gap: 0.8rem;
@@ -271,6 +442,32 @@
   background: #fff;
   padding: 0.9rem;
   animation: rise-in 420ms ease both;
+  cursor: pointer;
+  transition: border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
+}
+
+.recipe-card:hover {
+  border-color: #d7c4af;
+  box-shadow: 0 6px 16px rgba(80, 56, 38, 0.08);
+}
+
+.recipe-card:focus-visible {
+  outline: 2px solid var(--green-deep);
+  outline-offset: 2px;
+}
+
+.recipe-card--selected {
+  border-color: var(--green-deep);
+  box-shadow: 0 0 0 1px rgba(50, 103, 79, 0.25), 0 8px 20px rgba(50, 103, 79, 0.12);
+  transform: translateY(-1px);
+}
+
+.recipe-select-note {
+  margin: 0.2rem 0 0.5rem;
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--green-deep);
 }
 
 .recipe-head {

@@ -6,7 +6,14 @@ interface Props {
   effect: string
   secondaryColor?: string
   intensity?: number
+  recipeIngredients?: Record<string, number>
+  selectedRecipeName?: string
+  firingTempC?: number
+  stability?: string
+  foodSafe?: boolean
 }
+
+type IngredientMap = Record<string, number>
 
 function hexToRgb(hex: string) {
   return {
@@ -35,6 +42,75 @@ function seededRng(seed: number) {
   }
 }
 
+function clamp(v: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, v))
+}
+
+function mix(a: number, b: number, t: number) {
+  return Math.round(a + (b - a) * t)
+}
+
+function ingredientTotal(ingredients: IngredientMap | undefined, keys: string[]) {
+  if (!ingredients) return 0
+  return keys.reduce((sum, key) => sum + (ingredients[key] ?? 0), 0)
+}
+
+function deriveChemistry(
+  ingredients: IngredientMap | undefined,
+  firingTempC: number,
+  stability: string,
+  foodSafe: boolean,
+) {
+  const silica = ingredientTotal(ingredients, ['Silica', 'Flint', 'Quartz'])
+  const alumina = ingredientTotal(ingredients, ['Kaolin', 'EPK', 'Ball Clay', 'Alumina Hydrate'])
+  const flux = ingredientTotal(ingredients, [
+    'Potash Feldspar',
+    'Soda Feldspar',
+    'Nepheline Syenite',
+    'Frit 3134',
+    'Frit 3124',
+    'Whiting',
+    'Dolomite',
+    'Talc',
+    'Zinc Oxide',
+  ])
+  const boron = ingredientTotal(ingredients, ['Frit 3134', 'Frit 3124', 'Gerstley Borate', 'Colemanite'])
+  const opacifier = ingredientTotal(ingredients, ['Zircopax', 'Tin Oxide'])
+  const iron = ingredientTotal(ingredients, ['Red Iron Oxide', 'Yellow Iron Oxide'])
+  const manganese = ingredientTotal(ingredients, ['Manganese Dioxide'])
+  const rutile = ingredientTotal(ingredients, ['Rutile', 'Titanium Dioxide'])
+  const cobalt = ingredientTotal(ingredients, ['Cobalt Carbonate', 'Cobalt Oxide'])
+  const copper = ingredientTotal(ingredients, ['Copper Carbonate', 'Copper Oxide'])
+
+  const tempBias = clamp((firingTempC - 1180) / 150, -0.6, 0.9)
+  const baseFlow = (flux * 0.012 + boron * 0.02 + tempBias) - (silica * 0.006 + alumina * 0.01)
+  const flow = clamp(0.45 + baseFlow, 0.05, 1)
+
+  const chemistryGloss = clamp(0.25 + flow * 0.7 - opacifier * 0.01 - alumina * 0.004, 0, 1)
+  const opacity = clamp(0.12 + opacifier * 0.04 + alumina * 0.006 + rutile * 0.01, 0, 0.95)
+  const speckle = clamp((iron + manganese + rutile * 0.6) / 14, 0, 1)
+  const crystal = clamp((zincOrTitaniaHint(ingredients) + boron * 0.4) / 20, 0, 1)
+  const variegation = clamp((rutile * 0.75 + iron * 0.35 + copper * 0.45) / 10, 0, 1)
+  const chromaShift = clamp((cobalt * 0.05 + copper * 0.03) - (iron * 0.01 + rutile * 0.008), -0.3, 0.3)
+
+  const stabilityBias = stability === 'Low' ? 0.12 : stability === 'Medium' ? 0.05 : -0.04
+  const foodSafeBias = foodSafe ? -0.08 : 0
+
+  return {
+    flow: clamp(flow + stabilityBias + foodSafeBias, 0.05, 1),
+    gloss: clamp(chemistryGloss - (foodSafe ? 0.05 : 0), 0, 1),
+    opacity: clamp(opacity + (foodSafe ? 0.03 : 0), 0, 1),
+    speckle,
+    crystal,
+    variegation,
+    chromaShift,
+  }
+}
+
+function zincOrTitaniaHint(ingredients: IngredientMap | undefined) {
+  return ingredientTotal(ingredients, ['Zinc Oxide', 'Titanium Dioxide', 'Rutile'])
+}
+
 function drawGlaze(
   ctx: CanvasRenderingContext2D,
   w: number,
@@ -44,6 +120,10 @@ function drawGlaze(
   effect: string,
   secondaryColor?: string,
   intensity: number = 50,
+  recipeIngredients?: IngredientMap,
+  firingTempC: number = 1222,
+  stability: string = 'High',
+  foodSafe: boolean = false,
 ) {
   if (!/^#[0-9a-fA-F]{6}$/.test(color)) color = '#808080'
   const secHex = secondaryColor && /^#[0-9a-fA-F]{6}$/.test(secondaryColor) ? secondaryColor : null
@@ -54,8 +134,20 @@ function drawGlaze(
   const cx = w / 2
   const cy = h / 2
   const radius = Math.min(w, h) * 0.44
-  const { r, g, b } = hexToRgb(color)
-  const rng = seededRng(hashStr(color + surfaceFinish + effect + (secHex ?? '')))
+  const chemistry = deriveChemistry(recipeIngredients, firingTempC, stability, foodSafe)
+  let { r, g, b } = hexToRgb(color)
+  const neutralLift = 245
+  r = mix(r, neutralLift, chemistry.opacity * 0.12)
+  g = mix(g, neutralLift, chemistry.opacity * 0.12)
+  b = mix(b, neutralLift, chemistry.opacity * 0.12)
+  if (chemistry.chromaShift < 0) {
+    const down = Math.abs(chemistry.chromaShift)
+    r = mix(r, 128, down * 0.25)
+    g = mix(g, 128, down * 0.25)
+    b = mix(b, 128, down * 0.25)
+  }
+  const recipeSeed = recipeIngredients ? JSON.stringify(Object.entries(recipeIngredients).sort()) : 'no-recipe'
+  const rng = seededRng(hashStr(color + surfaceFinish + effect + (secHex ?? '') + recipeSeed))
 
   // ── clip to disc ──────────────────────────────────────────────
   ctx.save()
@@ -64,14 +156,25 @@ function drawGlaze(
   ctx.clip()
 
   // ── base fill ─────────────────────────────────────────────────
-  ctx.fillStyle = color
+  ctx.fillStyle = `rgb(${r},${g},${b})`
   ctx.fillRect(0, 0, w, h)
+
+  // More melt generally gives stronger vertical pooling and edge darkening.
+  const poolStrength = clamp(chemistry.flow * 0.75, 0, 0.8)
+  if (poolStrength > 0.05) {
+    const pool = ctx.createLinearGradient(0, cy - radius, 0, cy + radius)
+    pool.addColorStop(0, `rgba(255,255,255,${0.05 + poolStrength * 0.1})`)
+    pool.addColorStop(0.55, 'rgba(255,255,255,0)')
+    pool.addColorStop(1, `rgba(0,0,0,${0.08 + poolStrength * 0.25})`)
+    ctx.fillStyle = pool
+    ctx.fillRect(0, 0, w, h)
+  }
 
   // ── effect layer (underneath the surface-finish sheen) ────────
   switch (effect) {
     case 'Speckled': {
       const sec2 = secHex ? hexToRgb(secHex) : null
-      const dotCount = Math.round(60 + t * 320)   // 60 – 380
+      const dotCount = Math.round(60 + t * 300 + chemistry.speckle * 220)
       for (let i = 0; i < dotCount; i++) {
         const x = rng() * w
         const y = rng() * h
@@ -93,7 +196,7 @@ function drawGlaze(
     }
 
     case 'Crystalline': {
-      const count = Math.round(2 + t * 10)   // 2 – 12 crystals
+      const count = Math.round(2 + t * 9 + chemistry.crystal * 8)
       for (let c = 0; c < count; c++) {
         const kx = cx + (rng() - 0.5) * radius * 1.6
         const ky = cy + (rng() - 0.5) * radius * 1.6
@@ -132,8 +235,8 @@ function drawGlaze(
 
     case 'Variegated': {
       const sec4 = secHex ? hexToRgb(secHex) : null
-      const streakAlpha = 0.03 + t * 0.18
-      const spotCount = Math.round(6 + t * 28)   // 6 – 34 spots
+      const streakAlpha = 0.03 + t * 0.14 + chemistry.variegation * 0.12
+      const spotCount = Math.round(6 + t * 20 + chemistry.variegation * 20)
       for (let i = 0; i < 12; i++) {
         const x0 = rng() * w
         const x1 = x0 + (rng() - 0.5) * 60
@@ -173,7 +276,7 @@ function drawGlaze(
     }
 
     case 'Opaque': {
-      ctx.fillStyle = `rgba(255,255,255,${0.08 + t * 0.32})`
+      ctx.fillStyle = `rgba(255,255,255,${0.08 + t * 0.24 + chemistry.opacity * 0.28})`
       ctx.fillRect(0, 0, w, h)
       const blobCount = Math.round(2 + t * 5)
       for (let i = 0; i < blobCount; i++) {
@@ -192,7 +295,8 @@ function drawGlaze(
     }
 
     case 'Translucent': {
-      ctx.fillStyle = `rgba(255,255,255,${0.08 + t * 0.36})`
+      const haze = clamp(0.08 + t * 0.28 + chemistry.opacity * 0.15, 0.06, 0.45)
+      ctx.fillStyle = `rgba(255,255,255,${haze})`
       ctx.fillRect(0, 0, w, h)
       const tg = ctx.createLinearGradient(0, 0, w * 0.5, h * 0.5)
       tg.addColorStop(0, `rgba(255,255,255,${0.06 + t * 0.22})`)
@@ -204,11 +308,11 @@ function drawGlaze(
 
     case 'Melt': {
       const melt = secHex ? hexToRgb(secHex) : { r: Math.min(255, r + 80), g: Math.max(0, g - 30), b: Math.max(0, b - 30) }
-      const numDrips = Math.round(1 + t * 7)   // 1 – 8 drips
+      const numDrips = Math.round(1 + t * 6 + chemistry.flow * 5)
       for (let d = 0; d < numDrips; d++) {
         const ax = cx + (rng() - 0.5) * radius * 1.2
         const startY = cy - radius * (0.5 + rng() * 0.45)
-        const dripLen = radius * (0.3 + t * 1.0)   // longer drips at high intensity
+        const dripLen = radius * (0.3 + t * 0.8 + chemistry.flow * 0.55)
         const endY = Math.min(startY + dripLen, cy + radius * 0.92)
         const topW = 5 + rng() * 10
         const tipW = 0.5 + rng() * 2
@@ -255,7 +359,7 @@ function drawGlaze(
       const flameRgb = secHex
         ? hexToRgb(secHex)
         : { r: Math.min(255, r + 90), g: Math.min(255, g + 60), b: Math.max(0, b - 40) }
-      const flameCount = Math.round(3 + t * 11)   // 3–14 flame tongues
+      const flameCount = Math.round(3 + t * 9 + chemistry.flow * 4)
 
       for (let f = 0; f < flameCount; f++) {
         // anchor along bottom third of the disc, spread across width
@@ -323,11 +427,15 @@ function drawGlaze(
   }
 
   // ── surface-finish sheen ──────────────────────────────────────
-  if (surfaceFinish === 'Glossy') {
+  const finishTarget =
+    surfaceFinish === 'Glossy' ? 0.92 : surfaceFinish === 'Satin' ? 0.55 : 0.2
+  const effectiveGloss = clamp((finishTarget + chemistry.gloss) / 2, 0, 1)
+
+  if (effectiveGloss > 0.72) {
     const bg = ctx.createRadialGradient(cx - radius * 0.22, cy - radius * 0.22, 0, cx, cy, radius)
-    bg.addColorStop(0, 'rgba(255,255,255,0.32)')
+    bg.addColorStop(0, `rgba(255,255,255,${0.2 + effectiveGloss * 0.2})`)
     bg.addColorStop(0.38, 'rgba(255,255,255,0.04)')
-    bg.addColorStop(1, 'rgba(0,0,0,0.3)')
+    bg.addColorStop(1, `rgba(0,0,0,${0.18 + effectiveGloss * 0.16})`)
     ctx.fillStyle = bg
     ctx.fillRect(0, 0, w, h)
     // specular highlight
@@ -335,16 +443,16 @@ function drawGlaze(
       cx - radius * 0.37, cy - radius * 0.37, 0,
       cx - radius * 0.37, cy - radius * 0.37, radius * 0.19,
     )
-    spec.addColorStop(0, 'rgba(255,255,255,0.92)')
-    spec.addColorStop(0.45, 'rgba(255,255,255,0.28)')
+    spec.addColorStop(0, `rgba(255,255,255,${0.6 + effectiveGloss * 0.35})`)
+    spec.addColorStop(0.45, `rgba(255,255,255,${0.16 + effectiveGloss * 0.2})`)
     spec.addColorStop(1, 'rgba(255,255,255,0)')
     ctx.fillStyle = spec
     ctx.fillRect(0, 0, w, h)
-  } else if (surfaceFinish === 'Satin') {
+  } else if (effectiveGloss > 0.38) {
     const sg = ctx.createRadialGradient(cx - radius * 0.15, cy - radius * 0.15, 0, cx, cy, radius)
-    sg.addColorStop(0, 'rgba(255,255,255,0.2)')
+    sg.addColorStop(0, `rgba(255,255,255,${0.1 + effectiveGloss * 0.18})`)
     sg.addColorStop(0.48, 'rgba(255,255,255,0.02)')
-    sg.addColorStop(1, 'rgba(0,0,0,0.2)')
+    sg.addColorStop(1, `rgba(0,0,0,${0.1 + (1 - effectiveGloss) * 0.18})`)
     ctx.fillStyle = sg
     ctx.fillRect(0, 0, w, h)
   } else {
@@ -373,7 +481,18 @@ function drawGlaze(
   ctx.restore()
 }
 
-export function GlazePreview({ color, surfaceFinish, effect, secondaryColor, intensity = 50 }: Props) {
+export function GlazePreview({
+  color,
+  surfaceFinish,
+  effect,
+  secondaryColor,
+  intensity = 50,
+  recipeIngredients,
+  selectedRecipeName,
+  firingTempC,
+  stability,
+  foodSafe,
+}: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {
@@ -381,8 +500,21 @@ export function GlazePreview({ color, surfaceFinish, effect, secondaryColor, int
     if (!canvas) return
     const ctx = canvas.getContext('2d')
     if (!ctx) return
-    drawGlaze(ctx, canvas.width, canvas.height, color, surfaceFinish, effect, secondaryColor, intensity)
-  }, [color, surfaceFinish, effect, secondaryColor, intensity])
+    drawGlaze(
+      ctx,
+      canvas.width,
+      canvas.height,
+      color,
+      surfaceFinish,
+      effect,
+      secondaryColor,
+      intensity,
+      recipeIngredients,
+      firingTempC,
+      stability,
+      foodSafe,
+    )
+  }, [color, surfaceFinish, effect, secondaryColor, intensity, recipeIngredients, firingTempC, stability, foodSafe])
 
   return (
     <div className="glaze-preview-wrap">
@@ -393,7 +525,12 @@ export function GlazePreview({ color, surfaceFinish, effect, secondaryColor, int
         className="glaze-preview-canvas"
         aria-label="Glaze appearance preview"
       />
-      <p className="glaze-preview-caption">Preview</p>
+      <p className="glaze-preview-caption">
+        {recipeIngredients ? 'Preview (calibrated to top recipe)' : 'Preview (input estimate)'}
+      </p>
+      {selectedRecipeName ? (
+        <p className="glaze-preview-selected">Selected: {selectedRecipeName}</p>
+      ) : null}
     </div>
   )
 }

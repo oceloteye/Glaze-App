@@ -1,7 +1,26 @@
-import { useMemo, useState } from 'react'
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import './App.css'
+import { AIPreview } from './components/AIPreview'
 import { GlazePreview } from './GlazePreview'
+import { buildMaterialProfile } from './lib/glazeMaterialModel'
+import type { RealismControls } from './types/rendering'
+
+let realisticTilePreview3DPromise: Promise<typeof import('./components/RealisticTilePreview3D')> | null =
+  null
+
+function preloadRealisticTilePreview3D() {
+  if (!realisticTilePreview3DPromise) {
+    realisticTilePreview3DPromise = import('./components/RealisticTilePreview3D')
+  }
+  return realisticTilePreview3DPromise
+}
+
+const RealisticTilePreview3D = lazy(() =>
+  preloadRealisticTilePreview3D().then((module) => ({
+    default: module.RealisticTilePreview3D,
+  })),
+)
 
 type GlazeRequest = {
   color: string
@@ -12,6 +31,8 @@ type GlazeRequest = {
   intensity?: number
   secondaryColor?: string
   feldsparSubstitute?: string
+  colorCharacter?: string
+  foodSafe?: boolean
 }
 
 type RecipeSuggestion = {
@@ -41,68 +62,105 @@ const CONES: { name: string; tempC: number }[] = [
   { name: 'Cone 012', tempC: 861 },
   { name: 'Cone 011', tempC: 875 },
   { name: 'Cone 010', tempC: 894 },
-  { name: 'Cone 09',  tempC: 923 },
-  { name: 'Cone 08',  tempC: 945 },
-  { name: 'Cone 07',  tempC: 973 },
-  { name: 'Cone 06',  tempC: 999 },
-  { name: 'Cone 05',  tempC: 1031 },
-  { name: 'Cone 04',  tempC: 1063 },
-  { name: 'Cone 03',  tempC: 1101 },
-  { name: 'Cone 02',  tempC: 1120 },
-  { name: 'Cone 01',  tempC: 1137 },
-  { name: 'Cone 1',   tempC: 1154 },
-  { name: 'Cone 2',   tempC: 1162 },
-  { name: 'Cone 3',   tempC: 1168 },
-  { name: 'Cone 4',   tempC: 1186 },
-  { name: 'Cone 5',   tempC: 1196 },
-  { name: 'Cone 6',   tempC: 1222 },
-  { name: 'Cone 7',   tempC: 1240 },
-  { name: 'Cone 8',   tempC: 1263 },
-  { name: 'Cone 9',   tempC: 1280 },
-  { name: 'Cone 10',  tempC: 1285 },
+  { name: 'Cone 09', tempC: 923 },
+  { name: 'Cone 08', tempC: 945 },
+  { name: 'Cone 07', tempC: 973 },
+  { name: 'Cone 06', tempC: 999 },
+  { name: 'Cone 05', tempC: 1031 },
+  { name: 'Cone 04', tempC: 1063 },
+  { name: 'Cone 03', tempC: 1101 },
+  { name: 'Cone 02', tempC: 1120 },
+  { name: 'Cone 01', tempC: 1137 },
+  { name: 'Cone 1', tempC: 1154 },
+  { name: 'Cone 2', tempC: 1162 },
+  { name: 'Cone 3', tempC: 1168 },
+  { name: 'Cone 4', tempC: 1186 },
+  { name: 'Cone 5', tempC: 1196 },
+  { name: 'Cone 6', tempC: 1222 },
+  { name: 'Cone 7', tempC: 1240 },
+  { name: 'Cone 8', tempC: 1263 },
+  { name: 'Cone 9', tempC: 1280 },
+  { name: 'Cone 10', tempC: 1285 },
 ]
 
 function cToF(c: number): number {
-  return Math.round(c * 9 / 5 + 32)
+  return Math.round((c * 9) / 5 + 32)
 }
 
 function fToC(f: number): number {
-  return Math.round((f - 32) * 5 / 9)
+  return Math.round(((f - 32) * 5) / 9)
 }
 
 const SURFACE_FINISHES = ['Matte', 'Satin', 'Glossy'] as const
-type SurfaceFinish = typeof SURFACE_FINISHES[number]
+type SurfaceFinish = (typeof SURFACE_FINISHES)[number]
 
 const EFFECTS = [
-  { label: 'None',        value: '' },
-  { label: 'Speckled',    value: 'Speckled' },
+  { label: 'None', value: '' },
+  { label: 'Speckled', value: 'Speckled' },
   { label: 'Crystalline', value: 'Crystalline' },
-  { label: 'Variegated',  value: 'Variegated' },
-  { label: 'Flame',       value: 'Flame' },
-  { label: 'Melt',        value: 'Melt' },
-  { label: 'Opaque',      value: 'Opaque' },
+  { label: 'Variegated', value: 'Variegated' },
+  { label: 'Flame', value: 'Flame' },
+  { label: 'Melt', value: 'Melt' },
+  { label: 'Opaque', value: 'Opaque' },
   { label: 'Translucent', value: 'Translucent' },
 ] as const
 
 const EFFECTS_WITH_SECONDARY = new Set(['Speckled', 'Crystalline', 'Variegated', 'Flame', 'Melt'])
 
 const SECONDARY_COLOR_LABEL: Record<string, string> = {
-  Speckled:    'Speckle color',
+  Speckled: 'Speckle color',
   Crystalline: 'Crystal color',
-  Variegated:  'Streak color',
-  Flame:       'Flame color',
-  Melt:        'Melt color',
+  Variegated: 'Streak color',
+  Flame: 'Flame color',
+  Melt: 'Melt color',
 }
+
+const CLAY_BODY_OPTIONS = ['Porcelain', 'White Stoneware', 'Buff Stoneware', 'Iron-rich Stoneware'] as const
+const THICKNESS_OPTIONS = ['Thin', 'Medium', 'Thick'] as const
+const ATMOSPHERE_OPTIONS = ['Oxidation', 'Reduction'] as const
+const COOLING_OPTIONS = ['Fast', 'Normal', 'Slow'] as const
+const LIGHTING_OPTIONS = ['Studio Neutral', 'Daylight', 'Warm Indoor'] as const
 
 function nearestConeIndex(tempC: number): number {
   return CONES.reduce(
     (best, _, i) =>
       Math.abs(CONES[i].tempC - tempC) < Math.abs(CONES[best].tempC - tempC) ? i : best,
-    0
+    0,
   )
 }
 
+function formatTimestamp(date = new Date()): string {
+  return date.toISOString().replace(/[:.]/g, '-').slice(0, 19)
+}
+
+function downloadFile(fileName: string, content: string, mimeType: string) {
+  const blob = new Blob([content], { type: mimeType })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = fileName
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;')
+}
+
 function App() {
+  const openRealisticButtonRef = useRef<HTMLButtonElement | null>(null)
+  const openAiButtonRef = useRef<HTMLButtonElement | null>(null)
+  const modalPanelRef = useRef<HTMLDivElement | null>(null)
+  const lastOpenedPreviewRef = useRef<'realistic' | 'ai' | null>(null)
+  const wasModalOpenRef = useRef(false)
+
   const [form, setForm] = useState<GlazeRequest>({
     color: '#7f9e87',
     firingTempC: 1222,
@@ -110,19 +168,92 @@ function App() {
     stability: 'High',
     effects: ['Variegated'],
     feldsparSubstitute: 'Potash Feldspar',
+    colorCharacter: 'Natural',
+    foodSafe: false,
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [recipes, setRecipes] = useState<RecipeSuggestion[]>([])
+  const [selectedRecipeIndex, setSelectedRecipeIndex] = useState(0)
   const [tempUnit, setTempUnit] = useState<TempUnit>('C')
   const [tempInputStr, setTempInputStr] = useState('1222')
   const [secondaryColor, setSecondaryColor] = useState('#c17a3a')
   const [secondaryHexInput, setSecondaryHexInput] = useState('#c17a3a')
   const [effectIntensity, setEffectIntensity] = useState(50)
+  const [activePreviewModal, setActivePreviewModal] = useState<'realistic' | 'ai' | null>(null)
+  const [realismControls, setRealismControls] = useState<RealismControls>({
+    clayBody: 'White Stoneware',
+    thickness: 'Medium',
+    atmosphere: 'Oxidation',
+    cooling: 'Normal',
+    lighting: 'Studio Neutral',
+  })
+
+  useEffect(() => {
+    if (!activePreviewModal) {
+      if (wasModalOpenRef.current) {
+        if (lastOpenedPreviewRef.current === 'ai') {
+          openAiButtonRef.current?.focus()
+        } else {
+          openRealisticButtonRef.current?.focus()
+        }
+        wasModalOpenRef.current = false
+      }
+      return
+    }
+
+    wasModalOpenRef.current = true
+
+    const panel = modalPanelRef.current
+    if (!panel) return
+
+    const getFocusable = () =>
+      Array.from(
+        panel.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((el) => !el.hasAttribute('disabled') && el.getAttribute('aria-hidden') !== 'true')
+
+    const focusable = getFocusable()
+    ;(focusable[0] ?? panel).focus()
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        setActivePreviewModal(null)
+        return
+      }
+
+      if (event.key !== 'Tab') return
+
+      const items = getFocusable()
+      if (items.length === 0) {
+        event.preventDefault()
+        panel.focus()
+        return
+      }
+
+      const first = items[0]
+      const last = items[items.length - 1]
+      const active = document.activeElement as HTMLElement | null
+
+      if (event.shiftKey && active === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+    }
+    }, [activePreviewModal])
 
   const currentEffect = form.effects[0] ?? ''
   const showSecondaryColor = EFFECTS_WITH_SECONDARY.has(currentEffect)
-
   const coneIndex = useMemo(() => nearestConeIndex(form.firingTempC), [form.firingTempC])
 
   const handleSubmit = async (event: FormEvent) => {
@@ -149,13 +280,201 @@ function App() {
 
       const data: GenerateRecipesResponse = await response.json()
       setRecipes(data.recipes)
+      setSelectedRecipeIndex(0)
     } catch (requestError) {
       setError('Unable to generate recipes right now. Ensure the backend is running on port 8080.')
       setRecipes([])
+      setSelectedRecipeIndex(0)
       console.error(requestError)
     } finally {
       setLoading(false)
     }
+  }
+
+  const selectedRecipe = recipes[selectedRecipeIndex] ?? recipes[0]
+  const materialProfile = useMemo(
+    () =>
+      buildMaterialProfile({
+        color: form.color,
+        secondaryColor: showSecondaryColor ? secondaryColor : undefined,
+        surfaceFinish: form.surfaceFinish,
+        effect: form.effects[0] ?? 'None',
+        intensity: effectIntensity,
+        firingTempC: form.firingTempC,
+        stability: form.stability,
+        foodSafe: Boolean(form.foodSafe),
+        recipeIngredients: selectedRecipe?.ingredients,
+        controls: realismControls,
+      }),
+    [
+      effectIntensity,
+      form.color,
+      form.effects,
+      form.firingTempC,
+      form.foodSafe,
+      form.stability,
+      form.surfaceFinish,
+      realismControls,
+      secondaryColor,
+      selectedRecipe?.ingredients,
+      showSecondaryColor,
+    ],
+  )
+
+  const previewSeedKey = useMemo(
+    () =>
+      JSON.stringify({
+        recipe: selectedRecipe?.name ?? 'none',
+        ingredients: selectedRecipe?.ingredients ?? {},
+        controls: realismControls,
+        form,
+        effectIntensity,
+        secondaryColor: showSecondaryColor ? secondaryColor : null,
+      }),
+    [effectIntensity, form, realismControls, secondaryColor, selectedRecipe?.ingredients, selectedRecipe?.name, showSecondaryColor],
+  )
+
+  const buildExportPayload = () => {
+    const effect = form.effects[0] ?? 'None'
+    const params = {
+      color: form.color,
+      firingTempC: form.firingTempC,
+      firingTempF: cToF(form.firingTempC),
+      cone: CONES[coneIndex].name,
+      surfaceFinish: form.surfaceFinish,
+      stability: form.stability,
+      feldsparSubstitute: form.feldsparSubstitute ?? 'Potash Feldspar',
+      colorCharacter: form.colorCharacter ?? 'Natural',
+      foodSafe: form.foodSafe ? 'Yes' : 'No',
+      effect,
+      intensity: effect === 'None' ? undefined : effectIntensity,
+      secondaryColor: showSecondaryColor ? secondaryColor : undefined,
+      realismControls,
+    }
+
+    return {
+      exportedAt: new Date().toISOString(),
+      parameters: params,
+      recipes,
+    }
+  }
+
+  const handleExportJson = () => {
+    const payload = buildExportPayload()
+    const fileName = `glaze-recipes-${formatTimestamp()}.json`
+    downloadFile(fileName, JSON.stringify(payload, null, 2), 'application/json;charset=utf-8')
+  }
+
+  const handlePrint = () => {
+    setError(null)
+    const payload = buildExportPayload()
+
+    const paramsEntries = Object.entries(payload.parameters)
+      .filter(([, value]) => value !== undefined)
+      .map(([key, value]) => {
+        const title = key
+          .replace(/([A-Z])/g, ' $1')
+          .replace(/^./, (s) => s.toUpperCase())
+        return `<tr><th>${escapeHtml(title)}</th><td>${escapeHtml(String(value))}</td></tr>`
+      })
+      .join('')
+
+    const recipeSections = payload.recipes
+      .map((recipe) => {
+        const ingredients = Object.entries(recipe.ingredients)
+          .map(
+            ([ingredient, percent]) =>
+              `<tr><td>${escapeHtml(ingredient)}</td><td>${percent.toFixed(2)}%</td></tr>`,
+          )
+          .join('')
+
+        return `
+          <section class="recipe">
+            <h3>${escapeHtml(recipe.name)}</h3>
+            <p class="range">${escapeHtml(recipe.firingRange)}</p>
+            <p>${escapeHtml(recipe.rationale)}</p>
+            <table>
+              <thead><tr><th>Ingredient</th><th>Percent</th></tr></thead>
+              <tbody>${ingredients}</tbody>
+            </table>
+          </section>
+        `
+      })
+      .join('')
+
+    const documentHtml = `
+      <!doctype html>
+      <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>Glaze Recipe Report</title>
+        <style>
+          body { font-family: Georgia, 'Times New Roman', serif; margin: 24px; color: #1f1a16; }
+          h1, h2, h3 { margin: 0 0 8px; }
+          h1 { font-size: 26px; }
+          h2 { margin-top: 24px; font-size: 20px; }
+          h3 { font-size: 18px; }
+          p { margin: 0 0 10px; line-height: 1.45; }
+          .meta { color: #5f4b3f; margin-bottom: 18px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+          th, td { text-align: left; border: 1px solid #d7c8bb; padding: 6px 8px; font-size: 14px; }
+          th { background: #f6eee6; }
+          .recipe { border-top: 2px solid #e1d4c7; margin-top: 18px; padding-top: 14px; break-inside: avoid; }
+          .range { color: #5f4b3f; font-style: italic; }
+        </style>
+      </head>
+      <body>
+        <h1>Ceramic Glaze Composer - Recipe Report</h1>
+        <p class="meta">Generated ${escapeHtml(payload.exportedAt)}</p>
+        <h2>Glaze Parameters</h2>
+        <table>
+          <thead><tr><th>Parameter</th><th>Value</th></tr></thead>
+          <tbody>${paramsEntries}</tbody>
+        </table>
+        <h2>Recipes</h2>
+        ${recipeSections}
+      </body>
+      </html>
+    `
+
+    // Use a hidden iframe for printing to avoid pop-up blockers.
+    const iframe = document.createElement('iframe')
+    iframe.style.position = 'fixed'
+    iframe.style.right = '0'
+    iframe.style.bottom = '0'
+    iframe.style.width = '0'
+    iframe.style.height = '0'
+    iframe.style.border = '0'
+    iframe.setAttribute('aria-hidden', 'true')
+    document.body.appendChild(iframe)
+
+    const iframeDoc = iframe.contentDocument
+    const iframeWin = iframe.contentWindow
+
+    if (!iframeDoc || !iframeWin) {
+      document.body.removeChild(iframe)
+      setError('Could not initialize print document in this browser.')
+      return
+    }
+
+    iframeDoc.open()
+    iframeDoc.write(documentHtml)
+    iframeDoc.close()
+
+    const cleanup = () => {
+      window.setTimeout(() => {
+        if (iframe.parentNode) {
+          iframe.parentNode.removeChild(iframe)
+        }
+      }, 500)
+    }
+
+    iframeWin.onafterprint = cleanup
+    window.setTimeout(() => {
+      iframeWin.focus()
+      iframeWin.print()
+      cleanup()
+    }, 150)
   }
 
   return (
@@ -179,7 +498,44 @@ function App() {
             effect={form.effects[0] ?? ''}
             secondaryColor={showSecondaryColor ? secondaryColor : undefined}
             intensity={effectIntensity}
+            recipeIngredients={selectedRecipe?.ingredients}
+            selectedRecipeName={selectedRecipe?.name}
+            firingTempC={form.firingTempC}
+            stability={form.stability}
+            foodSafe={form.foodSafe ?? false}
           />
+{/* 
+          <div className="preview-actions">
+            <p className="deterministic-note">Deterministic render: On</p>
+            <button
+              ref={openAiButtonRef}
+              type="button"
+              className="ghost-btn"
+              onMouseEnter={preloadRealisticTilePreview3D}
+              onFocus={preloadRealisticTilePreview3D}
+              onTouchStart={preloadRealisticTilePreview3D}
+              onClick={() => {
+                lastOpenedPreviewRef.current = 'ai'
+                setActivePreviewModal('ai')
+              }}
+            >
+              Open AI Preview Modal
+            </button>
+            <button
+              ref={openRealisticButtonRef}
+              type="button"
+              className="ghost-btn"
+              onMouseEnter={preloadRealisticTilePreview3D}
+              onFocus={preloadRealisticTilePreview3D}
+              onTouchStart={preloadRealisticTilePreview3D}
+              onClick={() => {
+                lastOpenedPreviewRef.current = 'realistic'
+                setActivePreviewModal('realistic')
+              }}
+            >
+              Open Realistic Tile Render
+            </button>
+          </div> */}
 
           <label>
             Color goal
@@ -221,9 +577,7 @@ function App() {
                 onClick={() => {
                   const next: TempUnit = tempUnit === 'C' ? 'F' : 'C'
                   setTempUnit(next)
-                  setTempInputStr(
-                    String(next === 'C' ? form.firingTempC : cToF(form.firingTempC))
-                  )
+                  setTempInputStr(String(next === 'C' ? form.firingTempC : cToF(form.firingTempC)))
                 }}
               >
                 °{tempUnit}
@@ -239,9 +593,7 @@ function App() {
                 const idx = Number(event.target.value)
                 const newTempC = CONES[idx].tempC
                 setForm({ ...form, firingTempC: newTempC })
-                setTempInputStr(
-                  String(tempUnit === 'C' ? newTempC : cToF(newTempC))
-                )
+                setTempInputStr(String(tempUnit === 'C' ? newTempC : cToF(newTempC)))
               }}
             />
             <div className="temp-manual">
@@ -260,9 +612,7 @@ function App() {
                   }
                 }}
                 onBlur={() => {
-                  setTempInputStr(
-                    String(tempUnit === 'C' ? form.firingTempC : cToF(form.firingTempC))
-                  )
+                  setTempInputStr(String(tempUnit === 'C' ? form.firingTempC : cToF(form.firingTempC)))
                 }}
               />
               <span className="temp-unit-label">°{tempUnit}</span>
@@ -312,6 +662,34 @@ function App() {
               <option>Nepheline Syenite</option>
               <option>Soda Feldspar</option>
             </select>
+          </label>
+
+          <label>
+            Color character
+            <select
+              value={form.colorCharacter ?? 'Natural'}
+              onChange={(event) => setForm({ ...form, colorCharacter: event.target.value })}
+            >
+              <option>Natural</option>
+              <option>Clean</option>
+              <option>Earthy</option>
+              <option>Vibrant</option>
+            </select>
+          </label>
+
+          <label>
+            Dinnerware / food safe
+            <select
+              value={form.foodSafe ? 'Yes' : 'No'}
+              onChange={(event) => setForm({ ...form, foodSafe: event.target.value === 'Yes' })}
+            >
+              <option>No</option>
+              <option>Yes</option>
+            </select>
+            <p className="field-note">
+              Food-safe mode biases formulas toward more stable functional chemistry, but lab-style leach
+              testing is still required before production dinnerware use.
+            </p>
           </label>
 
           <label>
@@ -399,28 +777,195 @@ function App() {
           {recipes.length === 0 ? (
             <p className="empty-msg">Submit parameters to get glaze composition options.</p>
           ) : (
-            <div className="recipe-list">
-              {recipes.map((recipe) => (
-                <article className="recipe-card" key={recipe.name}>
-                  <div className="recipe-head">
-                    <h3>{recipe.name}</h3>
-                    <span>{recipe.firingRange}</span>
-                  </div>
-                  <p>{recipe.rationale}</p>
-                  <ul>
-                    {Object.entries(recipe.ingredients).map(([ingredient, percent]) => (
-                      <li key={ingredient}>
-                        <strong>{ingredient}</strong>
-                        <span>{percent.toFixed(2)}%</span>
-                      </li>
-                    ))}
-                  </ul>
-                </article>
-              ))}
-            </div>
+            <>
+              <div className="results-actions">
+                <button type="button" className="ghost-btn" onClick={handlePrint}>Print Recipe Sheet</button>
+                <button type="button" className="ghost-btn" onClick={handleExportJson}>Export JSON</button>
+              </div>
+              <div className="recipe-list">
+                {recipes.map((recipe, index) => (
+                  <article
+                    className={index === selectedRecipeIndex ? 'recipe-card recipe-card--selected' : 'recipe-card'}
+                    key={recipe.name}
+                    role="button"
+                    tabIndex={0}
+                    aria-pressed={index === selectedRecipeIndex}
+                    onClick={() => setSelectedRecipeIndex(index)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault()
+                        setSelectedRecipeIndex(index)
+                      }
+                    }}
+                  >
+                    <div className="recipe-head">
+                      <h3>{recipe.name}</h3>
+                      <span>{recipe.firingRange}</span>
+                    </div>
+                    <p className="recipe-select-note">
+                      {index === selectedRecipeIndex ? 'Active preview formula' : 'Click to preview this formula'}
+                    </p>
+                    <p>{recipe.rationale}</p>
+                    <ul>
+                      {Object.entries(recipe.ingredients).map(([ingredient, percent]) => (
+                        <li key={ingredient}>
+                          <strong>{ingredient}</strong>
+                          <span>{percent.toFixed(2)}%</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </article>
+                ))}
+              </div>
+            </>
           )}
         </section>
       </section>
+
+      {/* {activePreviewModal && (
+        <div
+          className="modal-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-label={activePreviewModal === 'ai' ? 'AI glaze concept renderer' : 'Realistic glaze tile renderer'}
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              setActivePreviewModal(null)
+            }
+          }}
+        >
+          <div className="modal-panel" ref={modalPanelRef} tabIndex={-1}>
+            <div className="modal-head">
+              <h3>{activePreviewModal === 'ai' ? 'AI Glaze Concept Render' : 'Realistic Test Tile Render'}</h3>
+              <button type="button" className="ghost-btn" onClick={() => setActivePreviewModal(null)}>
+                Close
+              </button>
+            </div>
+
+            {activePreviewModal === 'ai' ? (
+              <AIPreview
+                material={materialProfile}
+                seedKey={previewSeedKey}
+                lighting={realismControls.lighting}
+                clayBody={realismControls.clayBody}
+                effect={form.effects[0] ?? 'None'}
+                selectedRecipeName={selectedRecipe?.name}
+                selectedRecipeFiringRange={selectedRecipe?.firingRange}
+                selectedRecipeRationale={selectedRecipe?.rationale}
+                selectedRecipeIngredients={selectedRecipe?.ingredients}
+              />
+            ) : (
+              <Suspense fallback={<p className="glaze-preview-caption">Loading 3D renderer...</p>}>
+                <RealisticTilePreview3D
+                  material={materialProfile}
+                  lighting={realismControls.lighting}
+                  clayBody={realismControls.clayBody}
+                  effect={form.effects[0] ?? 'None'}
+                  seedKey={previewSeedKey}
+                />
+              </Suspense>
+            )}
+
+            {activePreviewModal === 'realistic' ? (
+              <div className="realism-controls">
+                <h3>Realism Controls</h3>
+                <div className="realism-grid">
+                  <label>
+                    Clay body
+                    <select
+                      value={realismControls.clayBody}
+                      onChange={(event) =>
+                        setRealismControls({
+                          ...realismControls,
+                          clayBody: event.target.value as RealismControls['clayBody'],
+                        })
+                      }
+                    >
+                      {CLAY_BODY_OPTIONS.map((opt) => (
+                        <option key={opt}>{opt}</option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label>
+                    Thickness
+                    <select
+                      value={realismControls.thickness}
+                      onChange={(event) =>
+                        setRealismControls({
+                          ...realismControls,
+                          thickness: event.target.value as RealismControls['thickness'],
+                        })
+                      }
+                    >
+                      {THICKNESS_OPTIONS.map((opt) => (
+                        <option key={opt}>{opt}</option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label>
+                    Atmosphere
+                    <select
+                      value={realismControls.atmosphere}
+                      onChange={(event) =>
+                        setRealismControls({
+                          ...realismControls,
+                          atmosphere: event.target.value as RealismControls['atmosphere'],
+                        })
+                      }
+                    >
+                      {ATMOSPHERE_OPTIONS.map((opt) => (
+                        <option key={opt}>{opt}</option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label>
+                    Cooling profile
+                    <select
+                      value={realismControls.cooling}
+                      onChange={(event) =>
+                        setRealismControls({
+                          ...realismControls,
+                          cooling: event.target.value as RealismControls['cooling'],
+                        })
+                      }
+                    >
+                      {COOLING_OPTIONS.map((opt) => (
+                        <option key={opt}>{opt}</option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label>
+                    Lighting preset
+                    <select
+                      value={realismControls.lighting}
+                      onChange={(event) =>
+                        setRealismControls({
+                          ...realismControls,
+                          lighting: event.target.value as RealismControls['lighting'],
+                        })
+                      }
+                    >
+                      {LIGHTING_OPTIONS.map((opt) => (
+                        <option key={opt}>{opt}</option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              </div>
+            ) : (
+              <div className="ai-modal-note">
+                <p className="glaze-preview-caption">
+                  This modal shows the AI concept render only. Use the preview controls to compare it with the fast preview.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )} */}
     </main>
   )
 }

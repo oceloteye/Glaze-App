@@ -16,6 +16,10 @@ public class GlazeRecipeService {
     private static final String DEFAULT_FELDSPAR = "Potash Feldspar";
     private static final String NEPHELINE_SYENITE = "Nepheline Syenite";
     private static final String SODA_FELDSPAR = "Soda Feldspar";
+    private static final String CHARACTER_NATURAL = "natural";
+    private static final String CHARACTER_CLEAN = "clean";
+    private static final String CHARACTER_EARTHY = "earthy";
+    private static final String CHARACTER_VIBRANT = "vibrant";
 
     // ── Public API ───────────────────────────────────────────────────────────
 
@@ -35,9 +39,10 @@ public class GlazeRecipeService {
 
         applySurfaceAdjustments(formula, req.surfaceFinish(), req.firingTempC());
         applyStabilityAdjustments(formula, req.stability());
-        applyColorants(formula, req.color(), req.secondaryColor());
+        applyColorants(formula, req.color(), req.secondaryColor(), req.colorCharacter());
         applyEffectAgents(formula, req.effects(), intensity, req.secondaryColor());
         applyFeldsparSubstitution(formula, req.feldsparSubstitute());
+        applyFoodSafetyAdjustments(formula, req.foodSafe());
         normalize(formula);
 
         return new RecipeSuggestion(
@@ -188,14 +193,28 @@ public class GlazeRecipeService {
 
     // ── Colorant additions ───────────────────────────────────────────────────
 
-    private static void applyColorants(Map<String, Double> formula, String primary, String secondary) {
-        if (isValidHex(primary))   addColorantFromHex(formula, primary,   1.0);
-        if (isValidHex(secondary)) addColorantFromHex(formula, secondary, 0.35);
+    private static void applyColorants(Map<String, Double> formula,
+                                       String primary,
+                                       String secondary,
+                                       String colorCharacter) {
+        String character = normalizeCharacter(colorCharacter);
+        if (isValidHex(primary)) {
+            addColorantFromHex(formula, primary, 1.0, character);
+        }
+        if (isValidHex(secondary)) {
+            addColorantFromHex(formula, secondary, 0.35, character);
+        }
     }
 
-    private static void addColorantFromHex(Map<String, Double> formula, String hex, double weight) {
+    private static void addColorantFromHex(Map<String, Double> formula,
+                                           String hex,
+                                           double weight,
+                                           String colorCharacter) {
         double[] hsl = hexToHsl(hex);
         double h = hsl[0], s = hsl[1], l = hsl[2];
+        double chromaFactor = applyCharacterChroma(0.55 + (0.9 * s), colorCharacter);
+        double darkFactor = clamp01((0.52 - l) / 0.52);
+        double lightFactor = clamp01((l - 0.48) / 0.52);
 
         if (l < 0.12) {
             // Near-black
@@ -207,33 +226,184 @@ public class GlazeRecipeService {
             adjust(formula, "Zircopax",  9.0 * weight);
         } else if ((h < 30) || h >= 330) {
             // Red / rust
-            adjust(formula, "Red Iron Oxide",  7.0 * weight);
+            adjust(formula, "Red Iron Oxide",  7.0 * weight * chromaFactor);
         } else if (h < 60) {
             // Orange
-            adjust(formula, "Red Iron Oxide",  4.0 * weight);
-            adjust(formula, "Rutile",          3.0 * weight);
+            adjust(formula, "Red Iron Oxide",  4.0 * weight * chromaFactor);
+            adjust(formula, "Rutile",          3.0 * weight * (0.7 + 0.6 * s));
         } else if (h < 80) {
             // Yellow / amber
-            adjust(formula, "Rutile",          5.5 * weight);
-            adjust(formula, "Yellow Iron Oxide", 2.0 * weight);
+            adjust(formula, "Rutile",          5.5 * weight * (0.7 + 0.6 * s));
+            adjust(formula, "Yellow Iron Oxide", 2.0 * weight * chromaFactor);
         } else if (h < 180) {
-            // Green
-            adjust(formula, "Copper Carbonate", 3.5 * weight);
-            if (h < 130) {
-                adjust(formula, "Yellow Iron Oxide", 1.0 * weight); // yellow-green warmth
+            // Green family: differentiate olive/chartreuse, true green, and mint/blue-green.
+            if (h < 105) {
+                // Olive and chartreuse: warmer iron-rich path.
+                adjust(formula, "Copper Carbonate", 2.8 * weight * chromaFactor);
+                adjust(formula, "Yellow Iron Oxide", 1.4 * weight * (0.6 + 0.8 * s));
+                adjust(formula, "Rutile", 0.9 * weight * (0.6 + darkFactor));
+                adjust(formula, "Red Iron Oxide", 0.8 * weight * darkFactor);
+            } else if (h < 150) {
+                // True greens.
+                adjust(formula, "Copper Carbonate", 3.6 * weight * chromaFactor);
+                adjust(formula, "Yellow Iron Oxide", 0.5 * weight * (0.5 + 0.8 * s));
+                adjust(formula, "Red Iron Oxide", 0.5 * weight * darkFactor);
+            } else {
+                // Mint/seafoam end: cooler with light opacification.
+                adjust(formula, "Copper Carbonate", 2.6 * weight * chromaFactor);
+                adjust(formula, "Cobalt Carbonate", 0.35 * weight * (0.5 + 0.8 * s));
+                adjust(formula, "Zircopax", 1.8 * weight * lightFactor);
             }
         } else if (h < 220) {
             // Cyan / teal
-            adjust(formula, "Copper Carbonate",  2.5 * weight);
-            adjust(formula, "Cobalt Carbonate",  0.4 * weight);
+            adjust(formula, "Copper Carbonate",  2.5 * weight * chromaFactor);
+            adjust(formula, "Cobalt Carbonate",  0.4 * weight * (0.7 + 0.7 * s));
         } else if (h < 260) {
-            // Blue
-            adjust(formula, "Cobalt Carbonate",  1.2 * weight);
+            // Blue family: navy vs medium blue vs sky blue.
+            if (l < 0.30) {
+                adjust(formula, "Cobalt Carbonate", 1.45 * weight * chromaFactor);
+                adjust(formula, "Manganese Dioxide", 0.9 * weight * (0.6 + darkFactor));
+                adjust(formula, "Red Iron Oxide", 0.35 * weight * darkFactor);
+            } else if (l > 0.66) {
+                adjust(formula, "Cobalt Carbonate", 0.95 * weight * chromaFactor);
+                adjust(formula, "Copper Carbonate", 0.55 * weight * (0.4 + 0.6 * s));
+                adjust(formula, "Zircopax", 2.6 * weight * lightFactor);
+            } else {
+                adjust(formula, "Cobalt Carbonate", 1.2 * weight * chromaFactor);
+                adjust(formula, "Copper Carbonate", 0.25 * weight * (0.4 + 0.6 * s));
+            }
         } else {
             // Purple / violet
-            adjust(formula, "Manganese Dioxide", 3.5 * weight);
-            adjust(formula, "Cobalt Carbonate",  0.6 * weight);
+            adjust(formula, "Manganese Dioxide", 3.5 * weight * chromaFactor);
+            adjust(formula, "Cobalt Carbonate",  0.6 * weight * (0.7 + 0.7 * s));
         }
+
+        // Tone adjustments ensure different shades within a hue map to different chemistry.
+        if (darkFactor > 0.0) {
+            adjust(formula, "Red Iron Oxide", 2.2 * weight * darkFactor);
+            adjust(formula, "Manganese Dioxide", 1.1 * weight * darkFactor);
+        }
+        if (lightFactor > 0.0) {
+            adjust(formula, "Zircopax", 3.8 * weight * lightFactor);
+        }
+        if (s < 0.28 && l >= 0.2 && l <= 0.8) {
+            adjust(formula, "Rutile", 0.9 * weight * (0.28 - s) / 0.28);
+        }
+
+        applyStudioProfileTuning(formula, h, s, l, weight);
+        applyCharacterBias(formula, colorCharacter, weight, darkFactor, lightFactor);
+    }
+
+    private static void applyCharacterBias(Map<String, Double> formula,
+                                           String colorCharacter,
+                                           double weight,
+                                           double darkFactor,
+                                           double lightFactor) {
+        switch (colorCharacter) {
+            case CHARACTER_CLEAN -> {
+                adjust(formula, "Zircopax", 0.9 * weight + 1.3 * weight * lightFactor);
+                adjust(formula, "Silica", 0.45 * weight);
+                adjust(formula, "Red Iron Oxide", -0.65 * weight);
+                adjust(formula, "Manganese Dioxide", -0.5 * weight);
+            }
+            case CHARACTER_EARTHY -> {
+                adjust(formula, "Rutile", 0.9 * weight);
+                adjust(formula, "Red Iron Oxide", 0.95 * weight + 0.5 * weight * darkFactor);
+                adjust(formula, "Yellow Iron Oxide", 0.55 * weight);
+                adjust(formula, "Zircopax", -0.7 * weight);
+            }
+            case CHARACTER_VIBRANT -> {
+                adjust(formula, "Copper Carbonate", 0.6 * weight);
+                adjust(formula, "Cobalt Carbonate", 0.35 * weight);
+                adjust(formula, "Lithium Carbonate", 0.3 * weight);
+                adjust(formula, "Rutile", -0.35 * weight);
+                adjust(formula, "Zircopax", -0.6 * weight);
+            }
+            default -> {
+                // Natural keeps the tuned model unchanged.
+            }
+        }
+    }
+
+    private static double applyCharacterChroma(double base, String colorCharacter) {
+        return switch (colorCharacter) {
+            case CHARACTER_CLEAN -> base * 0.92;
+            case CHARACTER_EARTHY -> base * 0.95;
+            case CHARACTER_VIBRANT -> base * 1.18;
+            default -> base;
+        };
+    }
+
+    private static String normalizeCharacter(String colorCharacter) {
+        if (colorCharacter == null || colorCharacter.isBlank()) {
+            return CHARACTER_NATURAL;
+        }
+        String normalized = colorCharacter.toLowerCase(Locale.ROOT).trim();
+        if (normalized.contains("clean")) {
+            return CHARACTER_CLEAN;
+        }
+        if (normalized.contains("earth")) {
+            return CHARACTER_EARTHY;
+        }
+        if (normalized.contains("vibr")) {
+            return CHARACTER_VIBRANT;
+        }
+        return CHARACTER_NATURAL;
+    }
+
+    // Second-pass tuning for common studio outcomes.
+    private static void applyStudioProfileTuning(Map<String, Double> formula,
+                                                 double h,
+                                                 double s,
+                                                 double l,
+                                                 double weight) {
+        if (isCeladonZone(h, s, l)) {
+            // Celadon: iron-kissed translucent green at higher silica.
+            adjust(formula, "Red Iron Oxide", 0.45 * weight);
+            adjust(formula, "Copper Carbonate", 0.35 * weight);
+            adjust(formula, "Silica", 0.9 * weight);
+            adjustIfPresent(formula, "EPK Kaolin", -0.45 * weight);
+        }
+
+        if (isRobinsEggZone(h, s, l)) {
+            // Robin's egg: soft blue with slight opacity and variegation potential.
+            adjust(formula, "Copper Carbonate", 0.75 * weight);
+            adjust(formula, "Cobalt Carbonate", 0.35 * weight);
+            adjust(formula, "Zircopax", 1.3 * weight);
+            adjust(formula, "Rutile", 0.3 * weight);
+        }
+
+        if (isArmyOliveZone(h, s, l)) {
+            // Army olive: earthy iron-dominant green-brown cast.
+            adjust(formula, "Yellow Iron Oxide", 0.95 * weight);
+            adjust(formula, "Red Iron Oxide", 0.7 * weight);
+            adjust(formula, "Rutile", 0.55 * weight);
+            adjust(formula, "Copper Carbonate", 0.2 * weight);
+        }
+
+        if (isSeafoamMintZone(h, s, l)) {
+            // Seafoam mint: clean, bright mint with cooler cast and opacity.
+            adjust(formula, "Copper Carbonate", 0.9 * weight);
+            adjust(formula, "Cobalt Carbonate", 0.22 * weight);
+            adjust(formula, "Zircopax", 1.7 * weight);
+            adjust(formula, "Silica", 0.35 * weight);
+        }
+    }
+
+    private static boolean isCeladonZone(double h, double s, double l) {
+        return h >= 100 && h <= 155 && s >= 0.18 && s <= 0.5 && l >= 0.38 && l <= 0.72;
+    }
+
+    private static boolean isRobinsEggZone(double h, double s, double l) {
+        return h >= 175 && h <= 210 && s >= 0.25 && s <= 0.65 && l >= 0.56 && l <= 0.84;
+    }
+
+    private static boolean isArmyOliveZone(double h, double s, double l) {
+        return h >= 70 && h <= 110 && s >= 0.22 && s <= 0.55 && l >= 0.24 && l <= 0.5;
+    }
+
+    private static boolean isSeafoamMintZone(double h, double s, double l) {
+        return h >= 145 && h <= 180 && s >= 0.22 && s <= 0.6 && l >= 0.62 && l <= 0.9;
     }
 
     // ── Effect-specific chemistry ─────────────────────────────────────────────
@@ -318,7 +488,35 @@ public class GlazeRecipeService {
             sb.append(effectNames).append(".");
         }
 
+        if (Boolean.TRUE.equals(req.foodSafe())) {
+            sb.append(" Dinnerware safety mode enabled: reduced high-leach-risk colorants and shifted toward a more stable silica/alumina balance.");
+        }
+
         return sb.toString().strip();
+    }
+
+    private static void applyFoodSafetyAdjustments(Map<String, Double> formula, Boolean foodSafe) {
+        if (!Boolean.TRUE.equals(foodSafe)) {
+            return;
+        }
+
+        // Increase network-formers and suspension for glaze durability.
+        adjust(formula, "Silica", 3.2);
+        adjust(formula, "EPK Kaolin", 1.9);
+        adjust(formula, "Bentonite", 0.5);
+
+        // Keep a little opacifier support for clean, stable surfaces.
+        adjust(formula, "Zircopax", 0.4);
+
+        // Reduce additives that can raise leachability risk in functional ware.
+        scaleIfPresent(formula, "Copper Carbonate", 0.45);
+        scaleIfPresent(formula, "Cobalt Carbonate", 0.35);
+        scaleIfPresent(formula, "Manganese Dioxide", 0.25);
+        scaleIfPresent(formula, "Manganese Granules", 0.15);
+        scaleIfPresent(formula, "Iron Chromate", 0.0);
+
+        // Tame very aggressive fluxing to reduce run/craze tendency.
+        scaleIfPresent(formula, "Lithium Carbonate", 0.75);
     }
 
     private static String fluxSystemDescription(int tempC, String feldspar) {
@@ -378,8 +576,18 @@ public class GlazeRecipeService {
         }
     }
 
+    private static void scaleIfPresent(Map<String, Double> f, String key, double factor) {
+        if (f.containsKey(key)) {
+            f.put(key, Math.max(0.0, f.get(key) * factor));
+        }
+    }
+
     private static double clamp(double v) {
         return Math.max(0.0, v);
+    }
+
+    private static double clamp01(double value) {
+        return Math.max(0.0, Math.min(1.0, value));
     }
 
     private static void normalize(Map<String, Double> formula) {
