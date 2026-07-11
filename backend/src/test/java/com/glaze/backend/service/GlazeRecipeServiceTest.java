@@ -24,7 +24,7 @@ class GlazeRecipeServiceTest {
     private static GlazeRequest request(String color, int tempC, String finish,
                                         String stability, List<String> effects,
                                         Integer intensity, String secondaryColor) {
-        return new GlazeRequest(color, tempC, finish, stability, effects, intensity, secondaryColor, null);
+        return new GlazeRequest(color, tempC, finish, stability, effects, intensity, secondaryColor, null, null, null);
     }
 
     private static GlazeRequest basicRequest(String color, int tempC) {
@@ -144,6 +144,125 @@ class GlazeRecipeServiceTest {
         var balanced = recipes.stream().filter(r -> r.name().contains("Balanced")).findFirst().orElseThrow();
         assertThat(balanced.ingredients()).containsKey("Zircopax");
     }
+
+    @Test
+    void shadesWithinSameHueProduceDifferentFormulas() {
+        var darkBlue = service.generateRecipes(basicRequest("#123a8a", 1220));
+        var lightBlue = service.generateRecipes(basicRequest("#8db4ff", 1220));
+
+        var darkBalanced = getBalanced(darkBlue).ingredients();
+        var lightBalanced = getBalanced(lightBlue).ingredients();
+
+        assertThat(darkBalanced).isNotEqualTo(lightBalanced);
+        assertThat(darkBalanced.getOrDefault("Manganese Dioxide", 0.0))
+                .isGreaterThan(lightBalanced.getOrDefault("Manganese Dioxide", 0.0));
+        assertThat(lightBalanced.getOrDefault("Zircopax", 0.0))
+                .isGreaterThan(darkBalanced.getOrDefault("Zircopax", 0.0));
+    }
+
+        @Test
+        void navyVsSkyBlueUseDifferentColorantProfiles() {
+        var navy = service.generateRecipes(basicRequest("#1b2d62", 1220));
+        var sky = service.generateRecipes(basicRequest("#84bdf2", 1220));
+
+        var navyBalanced = getBalanced(navy).ingredients();
+        var skyBalanced = getBalanced(sky).ingredients();
+
+        assertThat(navyBalanced.getOrDefault("Cobalt Carbonate", 0.0))
+            .isGreaterThan(skyBalanced.getOrDefault("Cobalt Carbonate", 0.0));
+        assertThat(navyBalanced.getOrDefault("Manganese Dioxide", 0.0))
+            .isGreaterThan(skyBalanced.getOrDefault("Manganese Dioxide", 0.0));
+        assertThat(skyBalanced.getOrDefault("Zircopax", 0.0))
+            .isGreaterThan(navyBalanced.getOrDefault("Zircopax", 0.0));
+        }
+
+        @Test
+        void oliveVsMintGreenShiftIronAndCopperBalance() {
+        var olive = service.generateRecipes(basicRequest("#6b7f32", 1220));
+        var mint = service.generateRecipes(basicRequest("#86e8b8", 1220));
+
+        var oliveBalanced = getBalanced(olive).ingredients();
+        var mintBalanced = getBalanced(mint).ingredients();
+
+        assertThat(oliveBalanced.getOrDefault("Red Iron Oxide", 0.0))
+            .isGreaterThan(mintBalanced.getOrDefault("Red Iron Oxide", 0.0));
+        assertThat(oliveBalanced.getOrDefault("Yellow Iron Oxide", 0.0))
+            .isGreaterThan(mintBalanced.getOrDefault("Yellow Iron Oxide", 0.0));
+        assertThat(mintBalanced.getOrDefault("Zircopax", 0.0))
+            .isGreaterThan(oliveBalanced.getOrDefault("Zircopax", 0.0));
+        }
+
+        @Test
+        void celadonVsRobinsEggShiftOpacityAndSilicaDirection() {
+        var celadon = service.generateRecipes(basicRequest("#7fa980", 1220));
+        var robinsEgg = service.generateRecipes(basicRequest("#8fc9d9", 1220));
+
+        var celadonBalanced = getBalanced(celadon).ingredients();
+        var robinsEggBalanced = getBalanced(robinsEgg).ingredients();
+
+        assertThat(celadonBalanced.getOrDefault("Silica", 0.0))
+            .isGreaterThan(robinsEggBalanced.getOrDefault("Silica", 0.0));
+        assertThat(robinsEggBalanced.getOrDefault("Zircopax", 0.0))
+            .isGreaterThan(celadonBalanced.getOrDefault("Zircopax", 0.0));
+        }
+
+        @Test
+        void armyOliveVsSeafoamMintShiftIronVersusOpacity() {
+        var armyOlive = service.generateRecipes(basicRequest("#5f6f2f", 1220));
+        var seafoam = service.generateRecipes(basicRequest("#9de3cd", 1220));
+
+        var armyBalanced = getBalanced(armyOlive).ingredients();
+        var seafoamBalanced = getBalanced(seafoam).ingredients();
+
+        assertThat(armyBalanced.getOrDefault("Red Iron Oxide", 0.0))
+            .isGreaterThan(seafoamBalanced.getOrDefault("Red Iron Oxide", 0.0));
+        assertThat(armyBalanced.getOrDefault("Yellow Iron Oxide", 0.0))
+            .isGreaterThan(seafoamBalanced.getOrDefault("Yellow Iron Oxide", 0.0));
+        assertThat(seafoamBalanced.getOrDefault("Zircopax", 0.0))
+            .isGreaterThan(armyBalanced.getOrDefault("Zircopax", 0.0));
+        }
+
+        @Test
+        void vibrantCharacterIncreasesChromaticColorants() {
+        var natural = new GlazeRequest("#2d7cc4", 1220, "Satin", "Medium", List.of(), 50, null, null, "Natural", null);
+        var vibrant = new GlazeRequest("#2d7cc4", 1220, "Satin", "Medium", List.of(), 50, null, null, "Vibrant", null);
+
+        var naturalBalanced = getBalanced(service.generateRecipes(natural)).ingredients();
+        var vibrantBalanced = getBalanced(service.generateRecipes(vibrant)).ingredients();
+
+        assertThat(vibrantBalanced.getOrDefault("Cobalt Carbonate", 0.0))
+            .isGreaterThan(naturalBalanced.getOrDefault("Cobalt Carbonate", 0.0));
+        assertThat(vibrantBalanced.getOrDefault("Copper Carbonate", 0.0))
+            .isGreaterThan(naturalBalanced.getOrDefault("Copper Carbonate", 0.0));
+        }
+
+        @Test
+        void earthyCharacterIncreasesIronAndRutile() {
+        var natural = new GlazeRequest("#6d8a3f", 1220, "Satin", "Medium", List.of(), 50, null, null, "Natural", null);
+        var earthy = new GlazeRequest("#6d8a3f", 1220, "Satin", "Medium", List.of(), 50, null, null, "Earthy", null);
+
+        var naturalBalanced = getBalanced(service.generateRecipes(natural)).ingredients();
+        var earthyBalanced = getBalanced(service.generateRecipes(earthy)).ingredients();
+
+        assertThat(earthyBalanced.getOrDefault("Red Iron Oxide", 0.0))
+            .isGreaterThan(naturalBalanced.getOrDefault("Red Iron Oxide", 0.0));
+        assertThat(earthyBalanced.getOrDefault("Rutile", 0.0))
+            .isGreaterThan(naturalBalanced.getOrDefault("Rutile", 0.0));
+        }
+
+        @Test
+        void cleanCharacterRaisesOpacityAndReducesDarkeners() {
+        var natural = new GlazeRequest("#84bdf2", 1220, "Satin", "Medium", List.of(), 50, null, null, "Natural", null);
+        var clean = new GlazeRequest("#84bdf2", 1220, "Satin", "Medium", List.of(), 50, null, null, "Clean", null);
+
+        var naturalBalanced = getBalanced(service.generateRecipes(natural)).ingredients();
+        var cleanBalanced = getBalanced(service.generateRecipes(clean)).ingredients();
+
+        assertThat(cleanBalanced.getOrDefault("Zircopax", 0.0))
+            .isGreaterThan(naturalBalanced.getOrDefault("Zircopax", 0.0));
+        assertThat(cleanBalanced.getOrDefault("Red Iron Oxide", 0.0))
+            .isLessThanOrEqualTo(naturalBalanced.getOrDefault("Red Iron Oxide", 0.0));
+        }
 
     @Test
     void invalidHexColorProducesNoColorant() {
@@ -311,6 +430,26 @@ class GlazeRecipeServiceTest {
                 request("#ffffff", 1220, "Glossy", "Medium", List.of(), 50, null));
         assertThat(getBalanced(recipes).name()).containsIgnoringCase("Gloss");
     }
+
+        @Test
+        void foodSafeModeReducesRiskierColorantsAndBoostsSilica() {
+        var normal = new GlazeRequest("#2d7cc4", 1220, "Satin", "Medium", List.of("Flame"),
+            50, null, "Potash Feldspar", "Vibrant", false);
+        var foodSafe = new GlazeRequest("#2d7cc4", 1220, "Satin", "Medium", List.of("Flame"),
+            50, null, "Potash Feldspar", "Vibrant", true);
+
+        var normalIngredients = getBalanced(service.generateRecipes(normal)).ingredients();
+        var safeIngredients = getBalanced(service.generateRecipes(foodSafe)).ingredients();
+
+        assertThat(safeIngredients.getOrDefault("Silica", 0.0))
+            .isGreaterThan(normalIngredients.getOrDefault("Silica", 0.0));
+        assertThat(safeIngredients.getOrDefault("Copper Carbonate", 0.0))
+            .isLessThan(normalIngredients.getOrDefault("Copper Carbonate", 0.0));
+        assertThat(safeIngredients.getOrDefault("Cobalt Carbonate", 0.0))
+            .isLessThan(normalIngredients.getOrDefault("Cobalt Carbonate", 0.0));
+        assertThat(safeIngredients.getOrDefault("Iron Chromate", 0.0))
+            .isLessThanOrEqualTo(normalIngredients.getOrDefault("Iron Chromate", 0.0));
+        }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 

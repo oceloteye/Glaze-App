@@ -39,6 +39,13 @@ public record GlazeRequest(
 
         /** Optional feldspar substitution: Potash Feldspar, Nepheline Syenite, or Soda Feldspar */
         @Size(max = 40, message = "Feldspar substitute must be 40 characters or less")
-        String feldsparSubstitute
+        String feldsparSubstitute,
+
+        /** Optional color character bias: Natural, Clean, Earthy, or Vibrant */
+        @Size(max = 20, message = "Color character must be 20 characters or less")
+        String colorCharacter,
+
+        /** Optional dinnerware safety mode. When true, recipe favors more stable food-safe chemistry. */
+        Boolean foodSafe
 ) {
 }
