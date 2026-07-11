@@ -1,14 +1,12 @@
 package com.glaze.backend.service;
 
-import com.glaze.backend.dto.GeminiPreviewRequest;
-import com.glaze.backend.dto.GeminiPreviewResponse;
+import java.io.IOException;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
-import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Comparator;
@@ -19,8 +17,12 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+
+import com.glaze.backend.dto.GeminiPreviewRequest;
+import com.glaze.backend.dto.GeminiPreviewResponse;
 
 @Service
 public class GeminiPreviewService {
