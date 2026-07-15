@@ -8,6 +8,16 @@ export type LightingPreset = 'Studio Neutral' | 'Daylight' | 'Warm Indoor'
 
 export type ConfidenceLevel = 'High' | 'Medium' | 'Low'
 
+export interface RecipeVisualSignals {
+  iron: number
+  rutile: number
+  opacifier: number
+  boron: number
+  cobalt: number
+  copper: number
+  manganese: number
+}
+
 export interface RealismControls {
   clayBody: ClayBody
   thickness: ApplicationThickness
@@ -29,6 +39,7 @@ export interface MaterialProfile {
   crystalDensity: number
   variegationStrength: number
   microPitting: number
+  recipeSignals: RecipeVisualSignals
   confidence: ConfidenceLevel
 }
 

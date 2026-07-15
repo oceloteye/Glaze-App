@@ -65,28 +65,6 @@ Sample response shape:
 
 Open two terminals from the workspace root.
 
-### 0) Configure Gemini API key (required for AI preview images)
-
-Set the key in PowerShell before starting the backend.
-
-Current terminal session only:
-
-```powershell
-$env:GEMINI_API_KEY="your_gemini_api_key_here"
-```
-
-Persist for future terminal sessions (open a new terminal after running this):
-
-```powershell
-setx GEMINI_API_KEY "your_gemini_api_key_here"
-```
-
-Optional check:
-
-```powershell
-if (Test-Path Env:GEMINI_API_KEY) { "GEMINI_API_KEY is set" } else { "GEMINI_API_KEY is NOT set" }
-```
-
 ### 1) Start backend
 
 ```powershell

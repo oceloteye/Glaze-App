@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
+import { describeRecipeVisualSignals } from '../lib/glazeMaterialModel'
 import { createNoiseMap, sampleNoise } from '../lib/seededNoise'
-import type { ClayBody, LightingPreset, MaterialProfile } from '../types/rendering'
+import type { ClayBody, LightingPreset, MaterialProfile, RecipeVisualSignals } from '../types/rendering'
 
 interface Props {
   material: MaterialProfile
@@ -12,18 +13,6 @@ interface Props {
   selectedRecipeFiringRange?: string
   selectedRecipeRationale?: string
   selectedRecipeIngredients?: Record<string, number>
-}
-
-function rgbToHex(rgb: { r: number; g: number; b: number }) {
-  const byte = (value: number) => Math.max(0, Math.min(255, Math.round(value))).toString(16).padStart(2, '0')
-  return `#${byte(rgb.r)}${byte(rgb.g)}${byte(rgb.b)}`
-}
-
-interface GeminiPreviewResponse {
-  provider: string
-  imageDataUrl: string | null
-  prompt: string
-  message: string
 }
 
 function hashStr(str: string): number {
@@ -99,6 +88,7 @@ function drawAiConcept(
   lighting: LightingPreset,
   clayBody: ClayBody,
   effect: string,
+  signals: RecipeVisualSignals,
 ) {
   const rng = seededRng(hashStr(`${seedKey}:ai-preview`))
   const noise = {
@@ -134,6 +124,24 @@ function drawAiConcept(
   const base = material.baseRgb
   const accent = material.accentRgb
   const glazeRadius = 18
+  const ironStrength = clamp(signals.iron / 8, 0, 1)
+  const rutileStrength = clamp(signals.rutile / 8, 0, 1)
+  const opacifierStrength = clamp(signals.opacifier / 10, 0, 1)
+  const boronStrength = clamp(signals.boron / 20, 0, 1)
+  const cobaltStrength = clamp(signals.cobalt / 2, 0, 1)
+  const copperStrength = clamp(signals.copper / 3, 0, 1)
+  const manganeseStrength = clamp(signals.manganese / 4, 0, 1)
+
+  const recipeAccent = {
+    r: mix(accent.r, 58, cobaltStrength * 0.65),
+    g: mix(accent.g, 118, copperStrength * 0.6),
+    b: mix(accent.b, 176, cobaltStrength * 0.8),
+  }
+  const ironTone = {
+    r: mix(base.r, 118, 0.55),
+    g: mix(base.g, 88, 0.6),
+    b: mix(base.b, 56, 0.72),
+  }
 
   ctx.fillStyle = `rgb(${body.r},${body.g},${body.b})`
   ctx.fillRect(tileX, tileY, tileW, tileH)
@@ -157,6 +165,29 @@ function drawAiConcept(
   ctx.fillStyle = glazeGrad
   ctx.fillRect(glazeX, glazeY, glazeW, glazeH)
 
+  const translucency = clamp(1 - material.opacity, 0.08, 0.92)
+  const bodyGlow = ctx.createLinearGradient(glazeX, glazeY, glazeX, glazeY + glazeH)
+  bodyGlow.addColorStop(0, `rgba(${body.r},${body.g},${body.b},${0.03 + translucency * 0.04})`)
+  bodyGlow.addColorStop(0.72, `rgba(${body.r},${body.g},${body.b},${0.08 + translucency * 0.14})`)
+  bodyGlow.addColorStop(1, `rgba(${body.r},${body.g},${body.b},${0.16 + translucency * 0.2})`)
+  ctx.fillStyle = bodyGlow
+  ctx.fillRect(glazeX, glazeY, glazeW, glazeH)
+
+  const opacityVeil = ctx.createLinearGradient(glazeX, glazeY, glazeX + glazeW, glazeY + glazeH)
+  opacityVeil.addColorStop(0, `rgba(255,255,255,${material.opacity * 0.1})`)
+  opacityVeil.addColorStop(0.45, `rgba(255,255,255,${material.opacity * 0.18 + opacifierStrength * 0.08})`)
+  opacityVeil.addColorStop(1, `rgba(245,244,240,${material.opacity * 0.22 + opacifierStrength * 0.12})`)
+  ctx.fillStyle = opacityVeil
+  ctx.fillRect(glazeX, glazeY, glazeW, glazeH)
+
+  if (ironStrength > 0.05) {
+    const ironWash = ctx.createLinearGradient(glazeX, glazeY, glazeX, glazeY + glazeH)
+    ironWash.addColorStop(0, `rgba(${ironTone.r},${ironTone.g},${ironTone.b},${0.03 + ironStrength * 0.05})`)
+    ironWash.addColorStop(1, `rgba(${ironTone.r},${ironTone.g},${ironTone.b},${0.06 + ironStrength * 0.12})`)
+    ctx.fillStyle = ironWash
+    ctx.fillRect(glazeX, glazeY, glazeW, glazeH)
+  }
+
   const brushCount = Math.round(12 + material.flow * 18)
   for (let i = 0; i < brushCount; i++) {
     const x = glazeX + rng() * glazeW
@@ -166,10 +197,10 @@ function drawAiConcept(
     const alpha = 0.03 + material.variegationStrength * 0.06 + rng() * 0.04
     const stroke = ctx.createLinearGradient(x - w * 0.3, y, x + w * 0.3, y + h)
     if (i % 3 === 0) {
-      stroke.addColorStop(0, `rgba(${accent.r},${accent.g},${accent.b},${alpha})`)
+      stroke.addColorStop(0, `rgba(${recipeAccent.r},${recipeAccent.g},${recipeAccent.b},${alpha + boronStrength * 0.03})`)
       stroke.addColorStop(1, 'rgba(0,0,0,0)')
     } else {
-      stroke.addColorStop(0, `rgba(255,255,255,${alpha * 0.85})`)
+      stroke.addColorStop(0, `rgba(255,255,255,${alpha * (0.85 + boronStrength * 0.15)})`)
       stroke.addColorStop(1, 'rgba(0,0,0,0)')
     }
     ctx.save()
@@ -187,9 +218,28 @@ function drawAiConcept(
     const radius = 10 + rng() * 24
     const n = sampleNoise(noise.mid, x, y)
     const bloom = ctx.createRadialGradient(x, y, 0, x, y, radius)
-    bloom.addColorStop(0, `rgba(${accent.r},${accent.g},${accent.b},${0.06 + n * 0.09})`)
+    bloom.addColorStop(0, `rgba(${mix(recipeAccent.r, 188, rutileStrength * 0.45)},${mix(recipeAccent.g, 156, rutileStrength * 0.38)},${mix(recipeAccent.b, 112, rutileStrength * 0.3)},${0.06 + n * 0.09 + rutileStrength * 0.06})`)
     bloom.addColorStop(1, 'rgba(0,0,0,0)')
     ctx.fillStyle = bloom
+    ctx.beginPath()
+    ctx.arc(x, y, radius, 0, Math.PI * 2)
+    ctx.fill()
+  }
+
+  const speckleCount = Math.round(18 + material.speckleDensity * 180 + ironStrength * 42 + manganeseStrength * 26)
+  for (let i = 0; i < speckleCount; i++) {
+    const x = glazeX + rng() * glazeW
+    const y = glazeY + rng() * glazeH
+    const radius = 0.45 + rng() * (0.8 + material.speckleDensity * 1.8 + ironStrength * 1.1)
+    const darkness = 28 + Math.round(rng() * 45)
+    const speckleColor = ironStrength > 0.08
+      ? {
+          r: mix(darkness, ironTone.r, 0.52),
+          g: mix(Math.max(18, darkness - 10), ironTone.g, 0.56),
+          b: mix(Math.max(12, darkness - 16), ironTone.b, 0.6),
+        }
+      : { r: darkness, g: Math.max(18, darkness - 10), b: Math.max(12, darkness - 16) }
+    ctx.fillStyle = `rgba(${speckleColor.r},${speckleColor.g},${speckleColor.b},${0.16 + material.speckleDensity * 0.3 + ironStrength * 0.08})`
     ctx.beginPath()
     ctx.arc(x, y, radius, 0, Math.PI * 2)
     ctx.fill()
@@ -206,7 +256,22 @@ function drawAiConcept(
     ctx.fillRect(px, py, 1, 1)
   }
 
-  const poolAlpha = 0.1 + material.pooling * 0.22
+  const pitCount = Math.round(material.microPitting * 42)
+  for (let i = 0; i < pitCount; i++) {
+    const x = glazeX + 8 + rng() * Math.max(1, glazeW - 16)
+    const y = glazeY + 8 + rng() * Math.max(1, glazeH - 16)
+    const radius = 0.8 + rng() * 1.4
+    ctx.beginPath()
+    ctx.arc(x, y, radius + 0.8, 0, Math.PI * 2)
+    ctx.fillStyle = 'rgba(255,255,255,0.16)'
+    ctx.fill()
+    ctx.beginPath()
+    ctx.arc(x, y, radius, 0, Math.PI * 2)
+    ctx.fillStyle = 'rgba(42, 29, 20, 0.18)'
+    ctx.fill()
+  }
+
+  const poolAlpha = 0.1 + material.pooling * 0.22 + boronStrength * 0.08
   const pooling = ctx.createLinearGradient(0, glazeY + glazeH * 0.42, 0, glazeY + glazeH)
   pooling.addColorStop(0, 'rgba(0,0,0,0)')
   pooling.addColorStop(1, `rgba(0,0,0,${poolAlpha})`)
@@ -214,9 +279,17 @@ function drawAiConcept(
   ctx.fillRect(glazeX, glazeY, glazeW, glazeH)
 
   const highlight = ctx.createLinearGradient(glazeX, glazeY, glazeX + glazeW * 0.7, glazeY + glazeH * 0.35)
-  highlight.addColorStop(0, `rgba(255,255,255,${0.14 + material.gloss * 0.22})`)
+  highlight.addColorStop(0, `rgba(255,255,255,${0.14 + material.gloss * 0.22 + boronStrength * 0.06})`)
   highlight.addColorStop(1, 'rgba(255,255,255,0)')
   ctx.fillStyle = highlight
+  ctx.fillRect(glazeX, glazeY, glazeW, glazeH)
+
+  const edgeBreak = ctx.createLinearGradient(glazeX, glazeY, glazeX + glazeW, glazeY)
+  edgeBreak.addColorStop(0, `rgba(${body.r},${body.g},${body.b},${material.edgeBreak * 0.22})`)
+  edgeBreak.addColorStop(0.18, 'rgba(0,0,0,0)')
+  edgeBreak.addColorStop(0.82, 'rgba(0,0,0,0)')
+  edgeBreak.addColorStop(1, `rgba(${body.r},${body.g},${body.b},${material.edgeBreak * 0.18})`)
+  ctx.fillStyle = edgeBreak
   ctx.fillRect(glazeX, glazeY, glazeW, glazeH)
 
   ctx.restore()
@@ -258,108 +331,36 @@ export function AIPreview({
   selectedRecipeName,
   selectedRecipeFiringRange,
   selectedRecipeRationale,
-  selectedRecipeIngredients,
 }: Props) {
-  const baseColorHex = rgbToHex(material.baseRgb)
+  const signals = material.recipeSignals
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const [imageDataUrl, setImageDataUrl] = useState<string | null>(null)
-  const [remoteMessage, setRemoteMessage] = useState('')
-  const [isLoadingGemini, setIsLoadingGemini] = useState(false)
+  const ingredientTags = useMemo(() => describeRecipeVisualSignals(signals), [signals])
 
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
     const ctx = canvas.getContext('2d')
     if (!ctx) return
-    drawAiConcept(ctx, canvas.width, canvas.height, material, seedKey, lighting, clayBody, effect)
-  }, [material, seedKey, lighting, clayBody, effect])
-
-  useEffect(() => {
-    const controller = new AbortController()
-    const fetchGeminiPreview = async () => {
-      setIsLoadingGemini(true)
-      setRemoteMessage('Generating glaze preview with Google Gemini...')
-
-      try {
-        const accentHex = rgbToHex(material.accentRgb)
-        const secondaryColorHex = accentHex.toLowerCase() !== baseColorHex.toLowerCase() ? accentHex : undefined
-
-        const response = await fetch('/api/ai/preview', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            baseColorHex,
-            secondaryColorHex,
-            surfaceFinish: material.gloss >= 0.72 ? 'Glossy' : material.gloss >= 0.4 ? 'Satin' : 'Matte',
-            effect: effect || 'None',
-            clayBody,
-            lighting,
-            selectedRecipeName,
-            selectedRecipeFiringRange,
-            selectedRecipeRationale,
-            selectedRecipeIngredients,
-            confidence: material.confidence,
-          }),
-          signal: controller.signal,
-        })
-
-        if (!response.ok) {
-          throw new Error(`AI preview request failed with status ${response.status}`)
-        }
-
-        const data = (await response.json()) as GeminiPreviewResponse
-        setImageDataUrl(data.imageDataUrl)
-        setRemoteMessage(data.message || '')
-      } catch (error) {
-        if (!controller.signal.aborted) {
-          setImageDataUrl(null)
-          setRemoteMessage(error instanceof Error ? error.message : 'Unable to generate Gemini preview.')
-        }
-      } finally {
-        if (!controller.signal.aborted) {
-          setIsLoadingGemini(false)
-        }
-      }
-    }
-
-    fetchGeminiPreview()
-
-    return () => {
-      controller.abort()
-    }
-  }, [
-    baseColorHex,
-    material,
-    effect,
-    clayBody,
-    lighting,
-    selectedRecipeName,
-    selectedRecipeFiringRange,
-    selectedRecipeRationale,
-    selectedRecipeIngredients,
-  ])
+    drawAiConcept(ctx, canvas.width, canvas.height, material, seedKey, lighting, clayBody, effect, signals)
+  }, [material, seedKey, lighting, clayBody, effect, signals])
 
   const summary = useMemo(() => describeForecast(material, effect), [material, effect])
 
   return (
     <div className="glaze-preview-wrap ai-preview-wrap">
-      {imageDataUrl ? (
-        <img src={imageDataUrl} alt="AI glaze concept preview" className="ai-preview-image" />
-      ) : (
-        <canvas
-          ref={canvasRef}
-          width={220}
-          height={220}
-          className="ai-preview-canvas"
-          aria-label="AI glaze concept preview"
-        />
-      )}
+      <canvas
+        ref={canvasRef}
+        width={220}
+        height={220}
+        className="ai-preview-canvas"
+        aria-label="Local glaze concept preview"
+      />
       <p className="glaze-preview-caption">
-        AI concept preview via Google Gemini {selectedRecipeName ? `for ${selectedRecipeName}` : '(formula forecast)'}
+        Local concept preview {selectedRecipeName ? `for ${selectedRecipeName}` : '(formula forecast)'}
       </p>
-      {isLoadingGemini || remoteMessage ? <p className="glaze-preview-caption">{remoteMessage}</p> : null}
+      <p className="glaze-preview-caption">Procedural tile render based on shared material and recipe chemistry signals.</p>
+      {selectedRecipeFiringRange ? <p className="glaze-preview-caption">Firing range: {selectedRecipeFiringRange}</p> : null}
+      {selectedRecipeRationale ? <p className="glaze-preview-caption">Recipe note: {selectedRecipeRationale}</p> : null}
       <div className="ai-preview-tags" aria-label="AI preview highlights">
         {summary.slice(1).map((tag) => (
           <span key={tag} className="ai-preview-tag">
@@ -367,6 +368,18 @@ export function AIPreview({
           </span>
         ))}
       </div>
+      {ingredientTags.length > 0 ? (
+        <>
+          <p className="glaze-preview-caption">Recipe signals reflected in local fallback</p>
+          <div className="ai-preview-tags" aria-label="Recipe-driven preview signals">
+            {ingredientTags.map((tag) => (
+              <span key={tag} className="ai-preview-tag">
+                {tag}
+              </span>
+            ))}
+          </div>
+        </>
+      ) : null}
       <p className="glaze-preview-selected">Forecast confidence: {material.confidence}</p>
     </div>
   )

@@ -1,4 +1,4 @@
-import type { MaterialModelInput, MaterialProfile } from '../types/rendering'
+import type { MaterialModelInput, MaterialProfile, RecipeVisualSignals } from '../types/rendering'
 
 function clamp(v: number, min: number, max: number) {
   return Math.max(min, Math.min(max, v))
@@ -7,6 +7,30 @@ function clamp(v: number, min: number, max: number) {
 function ingredientTotal(ingredients: Record<string, number> | undefined, keys: string[]) {
   if (!ingredients) return 0
   return keys.reduce((sum, key) => sum + (ingredients[key] ?? 0), 0)
+}
+
+export function buildRecipeVisualSignals(ingredients: Record<string, number> | undefined): RecipeVisualSignals {
+  return {
+    iron: ingredientTotal(ingredients, ['Red Iron Oxide', 'Yellow Iron Oxide', 'Iron Oxide']),
+    rutile: ingredientTotal(ingredients, ['Rutile', 'Titanium Dioxide']),
+    opacifier: ingredientTotal(ingredients, ['Zircopax', 'Tin Oxide']),
+    boron: ingredientTotal(ingredients, ['Frit 3134', 'Frit 3124', 'Gerstley Borate']),
+    cobalt: ingredientTotal(ingredients, ['Cobalt Oxide', 'Cobalt Carbonate']),
+    copper: ingredientTotal(ingredients, ['Copper Carbonate', 'Copper Oxide']),
+    manganese: ingredientTotal(ingredients, ['Manganese Dioxide', 'Manganese Carbonate']),
+  }
+}
+
+export function describeRecipeVisualSignals(signals: RecipeVisualSignals) {
+  const tags: string[] = []
+  if (signals.iron >= 2) tags.push('iron speckling')
+  if (signals.rutile >= 3) tags.push('rutile variegation')
+  if (signals.opacifier >= 4) tags.push('opaque milkiness')
+  if (signals.boron >= 8) tags.push('boron melt flow')
+  if (signals.cobalt >= 0.5) tags.push('cobalt blue bias')
+  if (signals.copper >= 1) tags.push('copper green cast')
+  if (signals.manganese >= 1) tags.push('manganese mottling')
+  return tags.slice(0, 4)
 }
 
 function hexToRgb(hex: string) {
@@ -32,6 +56,7 @@ function confidenceFromRange(flow: number, gloss: number, opacity: number): Mate
 export function buildMaterialProfile(input: MaterialModelInput): MaterialProfile {
   const baseRgb = hexToRgb(input.color)
   const accentRgb = hexToRgb(input.secondaryColor ?? input.color)
+  const recipeSignals = buildRecipeVisualSignals(input.recipeIngredients)
 
   const silica = ingredientTotal(input.recipeIngredients, ['Silica', 'Flint', 'Quartz'])
   const alumina = ingredientTotal(input.recipeIngredients, ['Kaolin', 'EPK', 'Ball Clay', 'Alumina Hydrate'])
@@ -47,9 +72,9 @@ export function buildMaterialProfile(input: MaterialModelInput): MaterialProfile
     'Zinc Oxide',
   ])
   const boron = ingredientTotal(input.recipeIngredients, ['Frit 3134', 'Frit 3124', 'Gerstley Borate'])
-  const iron = ingredientTotal(input.recipeIngredients, ['Red Iron Oxide', 'Yellow Iron Oxide', 'Iron Oxide'])
-  const rutile = ingredientTotal(input.recipeIngredients, ['Rutile', 'Titanium Dioxide'])
-  const opacifier = ingredientTotal(input.recipeIngredients, ['Zircopax', 'Tin Oxide'])
+  const iron = recipeSignals.iron
+  const rutile = recipeSignals.rutile
+  const opacifier = recipeSignals.opacifier
 
   const tempBias = clamp((input.firingTempC - 1180) / 150, -0.5, 0.9)
   const stabilityBias = input.stability === 'Low' ? 0.08 : input.stability === 'Medium' ? 0.03 : -0.02
@@ -95,6 +120,7 @@ export function buildMaterialProfile(input: MaterialModelInput): MaterialProfile
     crystalDensity,
     variegationStrength,
     microPitting,
+    recipeSignals,
     confidence: confidenceFromRange(flow, gloss, opacity),
   }
 }
