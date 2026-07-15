@@ -174,7 +174,6 @@ function App() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [recipes, setRecipes] = useState<RecipeSuggestion[]>([])
-  const [selectedRecipeIndex, setSelectedRecipeIndex] = useState(0)
   const [tempUnit, setTempUnit] = useState<TempUnit>('C')
   const [tempInputStr, setTempInputStr] = useState('1222')
   const [secondaryColor, setSecondaryColor] = useState('#c17a3a')
@@ -280,18 +279,24 @@ function App() {
 
       const data: GenerateRecipesResponse = await response.json()
       setRecipes(data.recipes)
-      setSelectedRecipeIndex(0)
     } catch (requestError) {
       setError('Unable to generate recipes right now. Ensure the backend is running on port 8080.')
       setRecipes([])
-      setSelectedRecipeIndex(0)
       console.error(requestError)
     } finally {
       setLoading(false)
     }
   }
 
-  const selectedRecipe = recipes[selectedRecipeIndex] ?? recipes[0]
+  const selectedRecipe = recipes[0]
+  const hasGeneratedRecipes = recipes.length > 0
+
+  useEffect(() => {
+    if (!hasGeneratedRecipes && activePreviewModal) {
+      setActivePreviewModal(null)
+    }
+  }, [activePreviewModal, hasGeneratedRecipes])
+
   const materialProfile = useMemo(
     () =>
       buildMaterialProfile({
@@ -504,38 +509,42 @@ function App() {
             stability={form.stability}
             foodSafe={form.foodSafe ?? false}
           />
-{/* 
+
           <div className="preview-actions">
             <p className="deterministic-note">Deterministic render: On</p>
             <button
               ref={openAiButtonRef}
               type="button"
               className="ghost-btn"
+              disabled={!hasGeneratedRecipes}
               onMouseEnter={preloadRealisticTilePreview3D}
               onFocus={preloadRealisticTilePreview3D}
               onTouchStart={preloadRealisticTilePreview3D}
               onClick={() => {
+                if (!hasGeneratedRecipes) return
                 lastOpenedPreviewRef.current = 'ai'
                 setActivePreviewModal('ai')
               }}
             >
-              Open AI Preview Modal
+              Open Local Preview Modal
             </button>
             <button
               ref={openRealisticButtonRef}
               type="button"
               className="ghost-btn"
+              disabled={!hasGeneratedRecipes}
               onMouseEnter={preloadRealisticTilePreview3D}
               onFocus={preloadRealisticTilePreview3D}
               onTouchStart={preloadRealisticTilePreview3D}
               onClick={() => {
+                if (!hasGeneratedRecipes) return
                 lastOpenedPreviewRef.current = 'realistic'
                 setActivePreviewModal('realistic')
               }}
             >
               Open Realistic Tile Render
             </button>
-          </div> */}
+          </div>
 
           <label>
             Color goal
@@ -783,28 +792,12 @@ function App() {
                 <button type="button" className="ghost-btn" onClick={handleExportJson}>Export JSON</button>
               </div>
               <div className="recipe-list">
-                {recipes.map((recipe, index) => (
-                  <article
-                    className={index === selectedRecipeIndex ? 'recipe-card recipe-card--selected' : 'recipe-card'}
-                    key={recipe.name}
-                    role="button"
-                    tabIndex={0}
-                    aria-pressed={index === selectedRecipeIndex}
-                    onClick={() => setSelectedRecipeIndex(index)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault()
-                        setSelectedRecipeIndex(index)
-                      }
-                    }}
-                  >
+                {recipes.map((recipe) => (
+                  <article className="recipe-card" key={recipe.name}>
                     <div className="recipe-head">
                       <h3>{recipe.name}</h3>
                       <span>{recipe.firingRange}</span>
                     </div>
-                    <p className="recipe-select-note">
-                      {index === selectedRecipeIndex ? 'Active preview formula' : 'Click to preview this formula'}
-                    </p>
                     <p>{recipe.rationale}</p>
                     <ul>
                       {Object.entries(recipe.ingredients).map(([ingredient, percent]) => (
@@ -822,12 +815,12 @@ function App() {
         </section>
       </section>
 
-      {/* {activePreviewModal && (
+      {activePreviewModal && hasGeneratedRecipes && (
         <div
           className="modal-backdrop"
           role="dialog"
           aria-modal="true"
-          aria-label={activePreviewModal === 'ai' ? 'AI glaze concept renderer' : 'Realistic glaze tile renderer'}
+          aria-label={activePreviewModal === 'ai' ? 'Local glaze concept renderer' : 'Realistic glaze tile renderer'}
           onClick={(event) => {
             if (event.target === event.currentTarget) {
               setActivePreviewModal(null)
@@ -836,7 +829,7 @@ function App() {
         >
           <div className="modal-panel" ref={modalPanelRef} tabIndex={-1}>
             <div className="modal-head">
-              <h3>{activePreviewModal === 'ai' ? 'AI Glaze Concept Render' : 'Realistic Test Tile Render'}</h3>
+              <h3>{activePreviewModal === 'ai' ? 'Local Glaze Concept Render' : 'Realistic Test Tile Render'}</h3>
               <button type="button" className="ghost-btn" onClick={() => setActivePreviewModal(null)}>
                 Close
               </button>
@@ -965,7 +958,7 @@ function App() {
             )}
           </div>
         </div>
-      )} */}
+      )}
     </main>
   )
 }
