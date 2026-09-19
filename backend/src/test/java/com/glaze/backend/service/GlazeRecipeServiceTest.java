@@ -4,7 +4,6 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import com.glaze.backend.dto.GlazeRequest;
@@ -12,19 +11,14 @@ import com.glaze.backend.dto.RecipeSuggestion;
 
 class GlazeRecipeServiceTest {
 
-    private GlazeRecipeService service;
-
-    @BeforeEach
-    void setUp() {
-        service = new GlazeRecipeService();
-    }
+    private final GlazeRecipeService service = new GlazeRecipeService();
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
     private static GlazeRequest request(String color, int tempC, String finish,
                                         String stability, List<String> effects,
                                         Integer intensity, String secondaryColor) {
-        return new GlazeRequest(color, tempC, finish, stability, effects, intensity, secondaryColor, null, null, null);
+        return new GlazeRequest(color, tempC, finish, stability, effects, intensity, secondaryColor, null, null, null, null);
     }
 
     private static GlazeRequest basicRequest(String color, int tempC) {
@@ -33,7 +27,7 @@ class GlazeRecipeServiceTest {
 
     /** Sums all ingredient percentages in a recipe. */
     private static double totalPercent(RecipeSuggestion recipe) {
-        return recipe.ingredients().values().stream().mapToDouble(Double::doubleValue).sum();
+        return recipe.ingredients().values().stream().mapToDouble(value -> value == null ? 0.0 : value).sum();
     }
 
     // ── Always returns 3 named variants ──────────────────────────────────────
@@ -47,7 +41,7 @@ class GlazeRecipeServiceTest {
     @Test
     void recipeNamesContainBalancedHighSilicaFluxed() {
         var recipes = service.generateRecipes(basicRequest("#3a6bc1", 1220));
-        var names = recipes.stream().map(RecipeSuggestion::name).toList();
+        var names = recipes.stream().map(recipe -> recipe.name()).toList();
         assertThat(names).anyMatch(n -> n.contains("Balanced"));
         assertThat(names).anyMatch(n -> n.contains("High-Silica"));
         assertThat(names).anyMatch(n -> n.contains("Fluxed"));
@@ -224,8 +218,8 @@ class GlazeRecipeServiceTest {
 
         @Test
         void vibrantCharacterIncreasesChromaticColorants() {
-        var natural = new GlazeRequest("#2d7cc4", 1220, "Satin", "Medium", List.of(), 50, null, null, "Natural", null);
-        var vibrant = new GlazeRequest("#2d7cc4", 1220, "Satin", "Medium", List.of(), 50, null, null, "Vibrant", null);
+        var natural = new GlazeRequest("#2d7cc4", 1220, "Satin", "Medium", List.of(), 50, null, null, "Natural", null, null);
+        var vibrant = new GlazeRequest("#2d7cc4", 1220, "Satin", "Medium", List.of(), 50, null, null, "Vibrant", null, null);
 
         var naturalBalanced = getBalanced(service.generateRecipes(natural)).ingredients();
         var vibrantBalanced = getBalanced(service.generateRecipes(vibrant)).ingredients();
@@ -238,8 +232,8 @@ class GlazeRecipeServiceTest {
 
         @Test
         void earthyCharacterIncreasesIronAndRutile() {
-        var natural = new GlazeRequest("#6d8a3f", 1220, "Satin", "Medium", List.of(), 50, null, null, "Natural", null);
-        var earthy = new GlazeRequest("#6d8a3f", 1220, "Satin", "Medium", List.of(), 50, null, null, "Earthy", null);
+        var natural = new GlazeRequest("#6d8a3f", 1220, "Satin", "Medium", List.of(), 50, null, null, "Natural", null, null);
+        var earthy = new GlazeRequest("#6d8a3f", 1220, "Satin", "Medium", List.of(), 50, null, null, "Earthy", null, null);
 
         var naturalBalanced = getBalanced(service.generateRecipes(natural)).ingredients();
         var earthyBalanced = getBalanced(service.generateRecipes(earthy)).ingredients();
@@ -252,8 +246,8 @@ class GlazeRecipeServiceTest {
 
         @Test
         void cleanCharacterRaisesOpacityAndReducesDarkeners() {
-        var natural = new GlazeRequest("#84bdf2", 1220, "Satin", "Medium", List.of(), 50, null, null, "Natural", null);
-        var clean = new GlazeRequest("#84bdf2", 1220, "Satin", "Medium", List.of(), 50, null, null, "Clean", null);
+        var natural = new GlazeRequest("#84bdf2", 1220, "Satin", "Medium", List.of(), 50, null, null, "Natural", null, null);
+        var clean = new GlazeRequest("#84bdf2", 1220, "Satin", "Medium", List.of(), 50, null, null, "Clean", null, null);
 
         var naturalBalanced = getBalanced(service.generateRecipes(natural)).ingredients();
         var cleanBalanced = getBalanced(service.generateRecipes(clean)).ingredients();
@@ -318,6 +312,52 @@ class GlazeRecipeServiceTest {
         assertThat(balanced.ingredients()).containsKey("Tin Oxide");
     }
 
+        @Test
+        void cone6PurpleVariegatedAvoidsOverdarkColorantLoad() {
+        var recipes = service.generateRecipes(
+            request("#6f42c1", 1230, "Satin", "Medium", List.of("Variegated"), 100, null));
+        var balanced = getBalanced(recipes).ingredients();
+
+        double manganese = balanced.getOrDefault("Manganese Dioxide", 0.0);
+        double ironLoad = balanced.getOrDefault("Iron Oxide", 0.0)
+            + balanced.getOrDefault("Red Iron Oxide", 0.0)
+            + balanced.getOrDefault("Yellow Iron Oxide", 0.0);
+        double cobalt = balanced.getOrDefault("Cobalt Carbonate", 0.0);
+
+        assertThat(manganese).isLessThanOrEqualTo(1.5);
+        assertThat(ironLoad).isLessThanOrEqualTo(1.5);
+        assertThat(cobalt).isGreaterThanOrEqualTo(0.65);
+        }
+
+    @Test
+    void purpleTargetPrefersVioletColorantsOverBlueCobaltBias() {
+        var recipes = service.generateRecipes(
+                request("#843adf", 1222, "Satin", "High", List.of(), 50, null));
+        var balanced = getBalanced(recipes).ingredients();
+
+        double manganese = balanced.getOrDefault("Manganese Dioxide", 0.0);
+        double cobalt = balanced.getOrDefault("Cobalt Carbonate", 0.0);
+        double copper = balanced.getOrDefault("Copper Carbonate", 0.0);
+
+        assertThat(manganese).isGreaterThan(cobalt);
+        assertThat(copper).isGreaterThan(0.0);
+    }
+
+    @Test
+    void midHighPurpleFiringStaysBalancedWithoutBlueCobaltDrift() {
+        var recipes = service.generateRecipes(request("#843adf", 1222, "Satin", "High", List.of(), 50, null));
+        var balanced = getBalanced(recipes).ingredients();
+
+        double manganese = balanced.getOrDefault("Manganese Dioxide", 0.0);
+        double cobalt = balanced.getOrDefault("Cobalt Carbonate", 0.0);
+        double copper = balanced.getOrDefault("Copper Carbonate", 0.0);
+
+        assertThat(manganese).isGreaterThan(0.75);
+        assertThat(manganese).isLessThanOrEqualTo(1.35);
+        assertThat(cobalt).isGreaterThanOrEqualTo(0.8);
+        assertThat(copper).isGreaterThan(0.0);
+    }
+
     // ── Intensity scaling ─────────────────────────────────────────────────────
 
     @Test
@@ -363,13 +403,10 @@ class GlazeRecipeServiceTest {
 
     @Test
     void secondaryColorAddsAdditionalColorant() {
-        var withoutSecondary = request("#0000cc", 1220, "Satin", "Medium", List.of("Speckled"), 50, null);
         var withSecondary    = request("#0000cc", 1220, "Satin", "Medium", List.of("Speckled"), 50, "#cc0000");
 
-        var recipesWithout = service.generateRecipes(withoutSecondary);
         var recipesWith    = service.generateRecipes(withSecondary);
 
-        double cobaltWithout = extractIngredient(recipesWithout, "Balanced", "Cobalt Carbonate");
         double cobaltWith    = extractIngredient(recipesWith, "Balanced", "Cobalt Carbonate");
 
         // Secondary red adds Red Iron Oxide; primary blue adds Cobalt Carbonate.
@@ -434,9 +471,9 @@ class GlazeRecipeServiceTest {
         @Test
         void foodSafeModeReducesRiskierColorantsAndBoostsSilica() {
         var normal = new GlazeRequest("#2d7cc4", 1220, "Satin", "Medium", List.of("Flame"),
-            50, null, "Potash Feldspar", "Vibrant", false);
+            50, null, "Potash Feldspar", "Vibrant", "oxidation", false);
         var foodSafe = new GlazeRequest("#2d7cc4", 1220, "Satin", "Medium", List.of("Flame"),
-            50, null, "Potash Feldspar", "Vibrant", true);
+            50, null, "Potash Feldspar", "Vibrant", "oxidation", true);
 
         var normalIngredients = getBalanced(service.generateRecipes(normal)).ingredients();
         var safeIngredients = getBalanced(service.generateRecipes(foodSafe)).ingredients();

@@ -6,6 +6,7 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 public record GlazeRequest(
@@ -44,6 +45,10 @@ public record GlazeRequest(
         /** Optional color character bias: Natural, Clean, Earthy, or Vibrant */
         @Size(max = 20, message = "Color character must be 20 characters or less")
         String colorCharacter,
+
+        /** Optional kiln atmosphere: oxidation or reduction. Defaults to oxidation when omitted. */
+        @Pattern(regexp = "(?i)oxidation|reduction", message = "Atmosphere must be oxidation or reduction")
+        String atmosphere,
 
         /** Optional dinnerware safety mode. When true, recipe favors more stable food-safe chemistry. */
         Boolean foodSafe
