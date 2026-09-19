@@ -33,7 +33,7 @@ class RecipeControllerTest {
 
     @Test
     void validRequestReturns200WithThreeRecipes() throws Exception {
-        var req = new GlazeRequest("#3a6bc1", 1220, "Satin", "Medium", List.of(), 50, null, null, null, null);
+        var req = new GlazeRequest("#3a6bc1", 1220, "Satin", "Medium", List.of(), 50, null, null, null, null, null);
 
         mockMvc.perform(post(URL)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -44,7 +44,7 @@ class RecipeControllerTest {
 
     @Test
     void responseContainsRecipeFields() throws Exception {
-        var req = new GlazeRequest("#00aa00", 1180, "Glossy", "High", List.of("Speckled"), 100, null, null, null, null);
+        var req = new GlazeRequest("#00aa00", 1180, "Glossy", "High", List.of("Speckled"), 100, null, null, null, null, null);
 
         mockMvc.perform(post(URL)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -58,7 +58,7 @@ class RecipeControllerTest {
 
     @Test
     void lowFireRequestSelectsLowFireRange() throws Exception {
-        var req = new GlazeRequest("#ffffff", 900, "Matte", "Low", List.of(), 50, null, null, null, null);
+        var req = new GlazeRequest("#ffffff", 900, "Matte", "Low", List.of(), 50, null, null, null, null, null);
 
         mockMvc.perform(post(URL)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -70,7 +70,7 @@ class RecipeControllerTest {
     @Test
     void requestWithSecondaryColorReturns200() throws Exception {
         var req = new GlazeRequest("#0000cc", 1220, "Satin", "Medium",
-                List.of("Speckled"), 75, "#cc0000", null, null, null);
+                List.of("Speckled"), 75, "#cc0000", null, null, null, null);
 
         mockMvc.perform(post(URL)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -82,7 +82,7 @@ class RecipeControllerTest {
     @Test
     void maxIntensityReturns200() throws Exception {
         var req = new GlazeRequest("#ffffff", 1280, "Glossy", "Medium",
-                List.of("Crystalline"), 200, null, null, null, null);
+                List.of("Crystalline"), 200, null, null, null, null, null);
 
         mockMvc.perform(post(URL)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -118,7 +118,7 @@ class RecipeControllerTest {
 
     @Test
     void temperatureBelowMinReturns400() throws Exception {
-        var req = new GlazeRequest("#ffffff", 100, "Satin", "Medium", List.of(), 50, null, null, null, null);
+        var req = new GlazeRequest("#ffffff", 100, "Satin", "Medium", List.of(), 50, null, null, null, null, null);
 
         mockMvc.perform(post(URL)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -128,7 +128,7 @@ class RecipeControllerTest {
 
     @Test
     void temperatureAboveMaxReturns400() throws Exception {
-        var req = new GlazeRequest("#ffffff", 1500, "Satin", "Medium", List.of(), 50, null, null, null, null);
+        var req = new GlazeRequest("#ffffff", 1500, "Satin", "Medium", List.of(), 50, null, null, null, null, null);
 
         mockMvc.perform(post(URL)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -138,7 +138,7 @@ class RecipeControllerTest {
 
     @Test
     void intensityAbove200Returns400() throws Exception {
-        var req = new GlazeRequest("#ffffff", 1220, "Satin", "Medium", List.of(), 201, null, null, null, null);
+        var req = new GlazeRequest("#ffffff", 1220, "Satin", "Medium", List.of(), 201, null, null, null, null, null);
 
         mockMvc.perform(post(URL)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -148,7 +148,7 @@ class RecipeControllerTest {
 
     @Test
     void intensityBelowZeroReturns400() throws Exception {
-        var req = new GlazeRequest("#ffffff", 1220, "Satin", "Medium", List.of(), -1, null, null, null, null);
+        var req = new GlazeRequest("#ffffff", 1220, "Satin", "Medium", List.of(), -1, null, null, null, null, null);
 
         mockMvc.perform(post(URL)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -158,7 +158,39 @@ class RecipeControllerTest {
 
     @Test
     void blankSurfaceFinishReturns400() throws Exception {
-        var req = new GlazeRequest("#ffffff", 1220, "", "Medium", List.of(), 50, null, null, null, null);
+        var req = new GlazeRequest("#ffffff", 1220, "", "Medium", List.of(), 50, null, null, null, null, null);
+
+        mockMvc.perform(post(URL)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void atmosphereOxidationAccepted() throws Exception {
+        var req = new GlazeRequest("#7f9e87", 1222, "Satin", "Medium", List.of("Variegated"), 50, null, null, null, "oxidation", null);
+
+        mockMvc.perform(post(URL)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.recipes", hasSize(3)));
+    }
+
+    @Test
+    void atmosphereReductionAccepted() throws Exception {
+        var req = new GlazeRequest("#7f9e87", 1222, "Satin", "Medium", List.of("Variegated"), 50, null, null, null, "reduction", null);
+
+        mockMvc.perform(post(URL)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.recipes", hasSize(3)));
+    }
+
+    @Test
+    void unsupportedAtmosphereRejected() throws Exception {
+        var req = new GlazeRequest("#7f9e87", 1222, "Satin", "Medium", List.of("Variegated"), 50, null, null, null, "neutral", null);
 
         mockMvc.perform(post(URL)
                         .contentType(MediaType.APPLICATION_JSON)

@@ -1,0 +1,392 @@
+import { useEffect, useMemo, useRef, useState } from 'react'
+import type { FormEvent } from 'react'
+import { buildMaterialProfile } from '../lib/glazeMaterialModel'
+import { CONES, EFFECTS_WITH_SECONDARY } from '../app/constants'
+import type {
+  GenerateRecipesResponse,
+  GlazeRequest,
+  PreviewModalMode,
+  RealismSettings,
+  RecipeExportPayload,
+  RecipeSuggestion,
+  TempUnit,
+} from '../app/types'
+import { cToF, downloadFile, escapeHtml, formatTimestamp, nearestConeIndex } from '../app/utils'
+
+const DEFAULT_FORM: GlazeRequest = {
+  color: '#7f9e87',
+  firingTempC: 1222,
+  surfaceFinish: 'Satin',
+  stability: 'High',
+  effects: [],
+  feldsparSubstitute: 'Potash Feldspar',
+  colorCharacter: 'Natural',
+  atmosphere: 'Oxidation',
+  foodSafe: true,
+}
+
+const DEFAULT_REALISM: RealismSettings = {
+  clayBody: 'White Stoneware',
+  thickness: 'Medium',
+  atmosphere: 'Oxidation',
+  cooling: 'Normal',
+  lighting: 'Studio Neutral',
+}
+
+export function useGlazeComposer() {
+  const openRealisticButtonRef = useRef<HTMLButtonElement | null>(null)
+  const openAiButtonRef = useRef<HTMLButtonElement | null>(null)
+  const modalPanelRef = useRef<HTMLDivElement | null>(null)
+  const lastOpenedPreviewRef = useRef<'realistic' | 'ai' | null>(null)
+  const wasModalOpenRef = useRef(false)
+
+  const [form, setForm] = useState<GlazeRequest>(DEFAULT_FORM)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [recipes, setRecipes] = useState<RecipeSuggestion[]>([])
+  const [tempUnit, setTempUnit] = useState<TempUnit>('C')
+  const [tempInputStr, setTempInputStr] = useState('1222')
+  const [secondaryColor, setSecondaryColor] = useState('#808080')
+  const [secondaryHexInput, setSecondaryHexInput] = useState('#808080')
+  const [effectIntensity, setEffectIntensity] = useState(50)
+  const [activePreviewModal, setActivePreviewModal] = useState<PreviewModalMode>(null)
+  const [realismControls, setRealismControls] = useState<RealismSettings>(DEFAULT_REALISM)
+
+  const currentEffect = form.effects[0] ?? ''
+  const showSecondaryColor = EFFECTS_WITH_SECONDARY.has(currentEffect)
+  const coneIndex = useMemo(() => nearestConeIndex(form.firingTempC, CONES), [form.firingTempC])
+  const selectedRecipe = recipes[0]
+  const hasGeneratedRecipes = recipes.length > 0
+
+  useEffect(() => {
+    if (!activePreviewModal) {
+      if (wasModalOpenRef.current) {
+        if (lastOpenedPreviewRef.current === 'ai') {
+          openAiButtonRef.current?.focus()
+        } else {
+          openRealisticButtonRef.current?.focus()
+        }
+        wasModalOpenRef.current = false
+      }
+      return
+    }
+
+    wasModalOpenRef.current = true
+
+    const panel = modalPanelRef.current
+    if (!panel) return
+
+    const getFocusable = () =>
+      Array.from(
+        panel.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((element) => !element.hasAttribute('disabled') && element.getAttribute('aria-hidden') !== 'true')
+
+    const focusable = getFocusable()
+    ;(focusable[0] ?? panel).focus()
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        setActivePreviewModal(null)
+        return
+      }
+
+      if (event.key !== 'Tab') return
+
+      const items = getFocusable()
+      if (items.length === 0) {
+        event.preventDefault()
+        panel.focus()
+        return
+      }
+
+      const first = items[0]
+      const last = items[items.length - 1]
+      const active = document.activeElement as HTMLElement | null
+
+      if (event.shiftKey && active === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [activePreviewModal])
+
+  useEffect(() => {
+    if (!hasGeneratedRecipes && activePreviewModal) {
+      setActivePreviewModal(null)
+    }
+  }, [activePreviewModal, hasGeneratedRecipes])
+
+  const materialProfile = useMemo(
+    () =>
+      buildMaterialProfile({
+        color: form.color,
+        secondaryColor: showSecondaryColor ? secondaryColor : undefined,
+        surfaceFinish: form.surfaceFinish,
+        effect: form.effects[0] ?? 'None',
+        intensity: effectIntensity,
+        firingTempC: form.firingTempC,
+        stability: form.stability,
+        foodSafe: Boolean(form.foodSafe),
+        recipeIngredients: selectedRecipe?.ingredients,
+        controls: realismControls,
+      }),
+    [
+      effectIntensity,
+      form.color,
+      form.effects,
+      form.firingTempC,
+      form.foodSafe,
+      form.stability,
+      form.surfaceFinish,
+      realismControls,
+      secondaryColor,
+      selectedRecipe?.ingredients,
+      showSecondaryColor,
+    ],
+  )
+
+  const previewSeedKey = useMemo(
+    () =>
+      JSON.stringify({
+        recipe: selectedRecipe?.name ?? 'none',
+        ingredients: selectedRecipe?.ingredients ?? {},
+        controls: realismControls,
+        form,
+        effectIntensity,
+        secondaryColor: showSecondaryColor ? secondaryColor : null,
+      }),
+    [effectIntensity, form, realismControls, secondaryColor, selectedRecipe?.ingredients, selectedRecipe?.name, showSecondaryColor],
+  )
+
+  const buildExportPayload = (): RecipeExportPayload => {
+    const effect = form.effects[0] ?? 'None'
+    return {
+      exportedAt: new Date().toISOString(),
+      parameters: {
+        color: form.color,
+        firingTempC: form.firingTempC,
+        firingTempF: cToF(form.firingTempC),
+        cone: CONES[coneIndex].name,
+        surfaceFinish: form.surfaceFinish,
+        stability: form.stability,
+        feldsparSubstitute: form.feldsparSubstitute ?? 'Potash Feldspar',
+        colorCharacter: form.colorCharacter ?? 'Natural',
+        foodSafe: form.foodSafe ? 'Yes' : 'No',
+        effect,
+        intensity: effect === 'None' ? undefined : effectIntensity,
+        secondaryColor: showSecondaryColor ? secondaryColor : undefined,
+        realismControls,
+      },
+      recipes,
+    }
+  }
+
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault()
+    setLoading(true)
+    setError(null)
+
+    try {
+      const response = await fetch('/api/recipes/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...form,
+          intensity: effectIntensity,
+          secondaryColor: showSecondaryColor ? secondaryColor : undefined,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`Request failed: ${response.status}`)
+      }
+
+      const data: GenerateRecipesResponse = await response.json()
+      setRecipes(data.recipes)
+    } catch (requestError) {
+      setError('Unable to generate recipes right now. Ensure the backend is running on port 8080.')
+      setRecipes([])
+      console.error(requestError)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleExportJson = () => {
+    const payload = buildExportPayload()
+    const fileName = `glaze-recipes-${formatTimestamp()}.json`
+    downloadFile(fileName, JSON.stringify(payload, null, 2), 'application/json;charset=utf-8')
+  }
+
+  const handlePrint = () => {
+    setError(null)
+    const payload = buildExportPayload()
+
+    const paramsEntries = Object.entries(payload.parameters)
+      .filter(([, value]) => value !== undefined)
+      .map(([key, value]) => {
+        const title = key.replace(/([A-Z])/g, ' $1').replace(/^./, (character) => character.toUpperCase())
+        return `<tr><th>${escapeHtml(title)}</th><td>${escapeHtml(String(value))}</td></tr>`
+      })
+      .join('')
+
+    const recipeSections = payload.recipes
+      .map((recipe) => {
+        const ingredients = Object.entries(recipe.ingredients)
+          .map(
+            ([ingredient, percent]) =>
+              `<tr><td>${escapeHtml(ingredient)}</td><td>${percent.toFixed(2)}%</td></tr>`,
+          )
+          .join('')
+
+        return `
+          <section class="recipe">
+            <h3>${escapeHtml(recipe.name)}</h3>
+            <p class="range">${escapeHtml(recipe.firingRange)}</p>
+            <p>${escapeHtml(recipe.rationale)}</p>
+            <table>
+              <thead><tr><th>Ingredient</th><th>Percent</th></tr></thead>
+              <tbody>${ingredients}</tbody>
+            </table>
+          </section>
+        `
+      })
+      .join('')
+
+    const documentHtml = `
+      <!doctype html>
+      <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>Glaze Recipe Report</title>
+        <style>
+          body { font-family: Georgia, 'Times New Roman', serif; margin: 24px; color: #1f1a16; }
+          h1, h2, h3 { margin: 0 0 8px; }
+          h1 { font-size: 26px; }
+          h2 { margin-top: 24px; font-size: 20px; }
+          h3 { font-size: 18px; }
+          p { margin: 0 0 10px; line-height: 1.45; }
+          .meta { color: #5f4b3f; margin-bottom: 18px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+          th, td { text-align: left; border: 1px solid #d7c8bb; padding: 6px 8px; font-size: 14px; }
+          th { background: #f6eee6; }
+          .recipe { border-top: 2px solid #e1d4c7; margin-top: 18px; padding-top: 14px; break-inside: avoid; }
+          .range { color: #5f4b3f; font-style: italic; }
+        </style>
+      </head>
+      <body>
+        <h1>Ceramic Glaze Composer - Recipe Report</h1>
+        <p class="meta">Generated ${escapeHtml(payload.exportedAt)}</p>
+        <h2>Glaze Parameters</h2>
+        <table>
+          <thead><tr><th>Parameter</th><th>Value</th></tr></thead>
+          <tbody>${paramsEntries}</tbody>
+        </table>
+        <h2>Recipes</h2>
+        ${recipeSections}
+      </body>
+      </html>
+    `
+
+    const iframe = document.createElement('iframe')
+    iframe.style.position = 'fixed'
+    iframe.style.right = '0'
+    iframe.style.bottom = '0'
+    iframe.style.width = '0'
+    iframe.style.height = '0'
+    iframe.style.border = '0'
+    iframe.setAttribute('aria-hidden', 'true')
+    document.body.appendChild(iframe)
+
+    const iframeDoc = iframe.contentDocument
+    const iframeWin = iframe.contentWindow
+
+    if (!iframeDoc || !iframeWin) {
+      document.body.removeChild(iframe)
+      setError('Could not initialize print document in this browser.')
+      return
+    }
+
+    iframeDoc.open()
+    iframeDoc.write(documentHtml)
+    iframeDoc.close()
+
+    const cleanup = () => {
+      window.setTimeout(() => {
+        if (iframe.parentNode) {
+          iframe.parentNode.removeChild(iframe)
+        }
+      }, 500)
+    }
+
+    iframeWin.onafterprint = cleanup
+    window.setTimeout(() => {
+      iframeWin.focus()
+      iframeWin.print()
+      cleanup()
+    }, 150)
+  }
+
+  const openPreview = (mode: 'realistic' | 'ai') => {
+    if (!hasGeneratedRecipes) return
+    lastOpenedPreviewRef.current = mode
+    setActivePreviewModal(mode)
+  }
+
+  const closePreview = () => {
+    setActivePreviewModal(null)
+  }
+
+  return {
+    form,
+    setForm,
+    loading,
+    error,
+    recipes,
+    setRecipes,
+    tempUnit,
+    setTempUnit,
+    tempInputStr,
+    setTempInputStr,
+    secondaryColor,
+    setSecondaryColor,
+    secondaryHexInput,
+    setSecondaryHexInput,
+    effectIntensity,
+    setEffectIntensity,
+    activePreviewModal,
+    setActivePreviewModal,
+    realismControls,
+    setRealismControls,
+    currentEffect,
+    showSecondaryColor,
+    coneIndex,
+    selectedRecipe,
+    hasGeneratedRecipes,
+    materialProfile,
+    previewSeedKey,
+    openAiButtonRef,
+    openRealisticButtonRef,
+    modalPanelRef,
+    handleSubmit,
+    handlePrint,
+    handleExportJson,
+    openPreview,
+    closePreview,
+  }
+}
+
+export type GlazeComposer = ReturnType<typeof useGlazeComposer>

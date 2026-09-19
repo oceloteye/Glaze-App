@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react'
-import { describeRecipeVisualSignals } from '../lib/glazeMaterialModel'
+import { useEffect, useRef } from 'react'
 import { createNoiseMap, sampleNoise } from '../lib/seededNoise'
 import type { ClayBody, LightingPreset, MaterialProfile, RecipeVisualSignals } from '../types/rendering'
 
@@ -64,21 +63,6 @@ function lightingSky(lighting: LightingPreset) {
   }
 }
 
-function labelFor(value: number, thresholds: [number, number], names: [string, string, string]) {
-  if (value < thresholds[0]) return names[0]
-  if (value < thresholds[1]) return names[1]
-  return names[2]
-}
-
-function describeForecast(material: MaterialProfile, effect: string) {
-  const effectName = effect || 'Neutral'
-  const flow = labelFor(material.flow, [0.42, 0.72], ['tight flow', 'balanced flow', 'strong pooling'])
-  const gloss = labelFor(material.gloss, [0.38, 0.72], ['matte finish', 'satin finish', 'gloss-forward'])
-  const texture = labelFor(material.roughness, [0.28, 0.58], ['smooth body', 'light texture', 'textured surface'])
-  const edge = labelFor(material.edgeBreak, [0.35, 0.7], ['crisp edges', 'softened edges', 'broken edges'])
-  return [effectName, flow, gloss, texture, edge]
-}
-
 function drawAiConcept(
   ctx: CanvasRenderingContext2D,
   width: number,
@@ -87,7 +71,6 @@ function drawAiConcept(
   seedKey: string,
   lighting: LightingPreset,
   clayBody: ClayBody,
-  effect: string,
   signals: RecipeVisualSignals,
 ) {
   const rng = seededRng(hashStr(`${seedKey}:ai-preview`))
@@ -301,25 +284,6 @@ function drawAiConcept(
   ctx.lineWidth = 1.5
   ctx.strokeRect(tileX + 0.75, tileY + 0.75, tileW - 1.5, tileH - 1.5)
 
-  const tags = describeForecast(material, effect)
-  ctx.font = '600 11px Georgia, serif'
-  ctx.textBaseline = 'middle'
-  let chipX = 18
-  const chipY = height - 23
-  for (const tag of tags) {
-    const textWidth = ctx.measureText(tag).width
-    const chipWidth = textWidth + 18
-    ctx.fillStyle = 'rgba(255,255,255,0.8)'
-    ctx.strokeStyle = 'rgba(82,58,42,0.16)'
-    ctx.lineWidth = 1
-    ctx.beginPath()
-    ctx.roundRect(chipX, chipY - 9, chipWidth, 20, 999)
-    ctx.fill()
-    ctx.stroke()
-    ctx.fillStyle = 'rgba(49, 34, 23, 0.92)'
-    ctx.fillText(tag, chipX + 9, chipY)
-    chipX += chipWidth + 6
-  }
 }
 
 export function AIPreview({
@@ -327,24 +291,17 @@ export function AIPreview({
   seedKey,
   lighting,
   clayBody,
-  effect,
-  selectedRecipeName,
-  selectedRecipeFiringRange,
-  selectedRecipeRationale,
 }: Props) {
   const signals = material.recipeSignals
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const ingredientTags = useMemo(() => describeRecipeVisualSignals(signals), [signals])
 
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
     const ctx = canvas.getContext('2d')
     if (!ctx) return
-    drawAiConcept(ctx, canvas.width, canvas.height, material, seedKey, lighting, clayBody, effect, signals)
-  }, [material, seedKey, lighting, clayBody, effect, signals])
-
-  const summary = useMemo(() => describeForecast(material, effect), [material, effect])
+    drawAiConcept(ctx, canvas.width, canvas.height, material, seedKey, lighting, clayBody, signals)
+  }, [material, seedKey, lighting, clayBody, signals])
 
   return (
     <div className="glaze-preview-wrap ai-preview-wrap">
@@ -355,32 +312,6 @@ export function AIPreview({
         className="ai-preview-canvas"
         aria-label="Local glaze concept preview"
       />
-      <p className="glaze-preview-caption">
-        Local concept preview {selectedRecipeName ? `for ${selectedRecipeName}` : '(formula forecast)'}
-      </p>
-      <p className="glaze-preview-caption">Procedural tile render based on shared material and recipe chemistry signals.</p>
-      {selectedRecipeFiringRange ? <p className="glaze-preview-caption">Firing range: {selectedRecipeFiringRange}</p> : null}
-      {selectedRecipeRationale ? <p className="glaze-preview-caption">Recipe note: {selectedRecipeRationale}</p> : null}
-      <div className="ai-preview-tags" aria-label="AI preview highlights">
-        {summary.slice(1).map((tag) => (
-          <span key={tag} className="ai-preview-tag">
-            {tag}
-          </span>
-        ))}
-      </div>
-      {ingredientTags.length > 0 ? (
-        <>
-          <p className="glaze-preview-caption">Recipe signals reflected in local fallback</p>
-          <div className="ai-preview-tags" aria-label="Recipe-driven preview signals">
-            {ingredientTags.map((tag) => (
-              <span key={tag} className="ai-preview-tag">
-                {tag}
-              </span>
-            ))}
-          </div>
-        </>
-      ) : null}
-      <p className="glaze-preview-selected">Forecast confidence: {material.confidence}</p>
     </div>
   )
 }
