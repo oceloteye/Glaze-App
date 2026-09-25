@@ -2,6 +2,7 @@ package com.glaze.backend.service;
 
 import com.glaze.backend.dto.GlazeRequest;
 import com.glaze.backend.dto.RecipeSuggestion;
+import com.glaze.backend.service.recipe.FiringScheduleBuilder;
 import com.glaze.backend.service.recipe.RecipeBaseFactory;
 import com.glaze.backend.service.recipe.RecipeMath;
 import com.glaze.backend.service.recipe.RecipeModifier;
@@ -40,6 +41,7 @@ public class GlazeRecipeService {
                 RecipeNarrativeBuilder.recipeName(variant, req),
                 RecipeNarrativeBuilder.firingRangeFor(req.firingTempC()),
                 formula,
-                RecipeNarrativeBuilder.buildRationale(variant, req, formula));
+                RecipeNarrativeBuilder.buildRationale(variant, req, formula),
+                FiringScheduleBuilder.buildAll(variant, req, formula));
     }
 }

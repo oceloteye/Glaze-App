@@ -24,8 +24,8 @@ import static com.glaze.backend.service.recipe.RecipeIngredients.TIN_OXIDE;
 import static com.glaze.backend.service.recipe.RecipeIngredients.TITANIUM_DIOXIDE;
 import static com.glaze.backend.service.recipe.RecipeIngredients.WOLLASTONITE;
 import static com.glaze.backend.service.recipe.RecipeIngredients.YELLOW_IRON_OXIDE;
-import static com.glaze.backend.service.recipe.RecipeIngredients.ZIRCOPAX;
 import static com.glaze.backend.service.recipe.RecipeIngredients.ZINC_OXIDE;
+import static com.glaze.backend.service.recipe.RecipeIngredients.ZIRCOPAX;
 
 public final class RecipeModifier {
 

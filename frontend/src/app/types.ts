@@ -16,11 +16,38 @@ export type GlazeRequest = {
   foodSafe?: boolean
 }
 
+export type FiringSegment = {
+  phase: 'Heat' | 'Cool'
+  rateCPerHour: number | null
+  rateFPerHour: number | null
+  targetTempC: number
+  targetTempF: number
+  holdMinutes: number
+  note: string
+}
+
+export type ScheduleLength = 'short' | 'medium' | 'long'
+
+export type FiringSchedule = {
+  length: ScheduleLength
+  cone: string
+  peakTempC: number
+  peakTempF: number
+  atmosphere: string
+  coolingStrategy: string
+  heatingHours: number
+  coolingHours: number
+  estimatedHours: number
+  segments: FiringSegment[]
+  notes: string[]
+}
+
 export type RecipeSuggestion = {
   name: string
   firingRange: string
   ingredients: Record<string, number>
   rationale: string
+  firingSchedules: FiringSchedule[]
 }
 
 export type GenerateRecipesResponse = {
@@ -32,6 +59,7 @@ export type PreviewModalMode = 'realistic' | 'ai' | null
 export type RecipeExportPayload = {
   exportedAt: string
   parameters: Record<string, unknown>
+  scheduleLength: ScheduleLength
   recipes: RecipeSuggestion[]
 }
 

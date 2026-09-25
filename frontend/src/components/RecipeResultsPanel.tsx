@@ -1,11 +1,108 @@
 import type { GlazeComposer } from '../hooks/useGlazeComposer'
+import type { FiringSchedule, RecipeSuggestion, ScheduleLength } from '../app/types'
 
 interface Props {
   composer: GlazeComposer
 }
 
+type ExportFormat = 'json' | 'csv'
+
+const SCHEDULE_LENGTHS: Array<{ value: ScheduleLength; label: string; hint: string }> = [
+  { value: 'short', label: 'Short', hint: 'Fast ramps, brief soak — thin, well-dried work' },
+  { value: 'medium', label: 'Medium', hint: 'Standard studio schedule' },
+  { value: 'long', label: 'Long', hint: 'Slow ramps, extended soak, controlled cool — thick or large pieces' },
+]
+
+function formatScheduleTime(schedule: FiringSchedule) {
+  return `~${schedule.estimatedHours} h total (${schedule.heatingHours} h heat / ${schedule.coolingHours} h cool)`
+}
+
+function formatRate(rateC: number | null, rateF: number | null) {
+  if (rateC === null || rateF === null) return 'Full'
+  return `${rateC}°C / ${rateF}°F per hr`
+}
+
+function formatHold(minutes: number) {
+  if (minutes === 0) return '—'
+  if (minutes >= 60) {
+    const hours = Math.floor(minutes / 60)
+    const rest = minutes % 60
+    return rest === 0 ? `${hours} h` : `${hours} h ${rest} min`
+  }
+  return `${minutes} min`
+}
+
+function FiringScheduleSection({
+  recipe,
+  schedule,
+  onExport,
+}: {
+  recipe: RecipeSuggestion
+  schedule: FiringSchedule
+  onExport: (recipe: RecipeSuggestion, format: ExportFormat) => void
+}) {
+  return (
+    <details className="firing-schedule">
+      <summary>
+        <span>Recommended firing schedule</span>
+        <span className="firing-schedule__meta">
+          {schedule.length} · Cone {schedule.cone} · {schedule.atmosphere} · {schedule.coolingStrategy} · {formatScheduleTime(schedule)}
+        </span>
+      </summary>
+      <div className="firing-schedule__actions">
+        <span>Export for controller:</span>
+        <button type="button" className="ghost-btn ghost-btn--small" onClick={() => onExport(recipe, 'json')}>
+          JSON
+        </button>
+        <button type="button" className="ghost-btn ghost-btn--small" onClick={() => onExport(recipe, 'csv')}>
+          CSV
+        </button>
+      </div>
+      <table className="firing-schedule__table">
+        <thead>
+          <tr>
+            <th>Phase</th>
+            <th>Rate</th>
+            <th>Target</th>
+            <th>Hold</th>
+            <th>Note</th>
+          </tr>
+        </thead>
+        <tbody>
+          {schedule.segments.map((segment, index) => (
+            <tr key={index} className={`firing-schedule__row firing-schedule__row--${segment.phase.toLowerCase()}`}>
+              <td>{segment.phase}</td>
+              <td>{formatRate(segment.rateCPerHour, segment.rateFPerHour)}</td>
+              <td>
+                {segment.targetTempC}°C / {segment.targetTempF}°F
+              </td>
+              <td>{formatHold(segment.holdMinutes)}</td>
+              <td className="firing-schedule__note">{segment.note}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {schedule.notes.length > 0 && (
+        <ul className="firing-schedule__notes">
+          {schedule.notes.map((note) => (
+            <li key={note}>{note}</li>
+          ))}
+        </ul>
+      )}
+    </details>
+  )
+}
+
 export function RecipeResultsPanel({ composer }: Props) {
-  const { recipes, handlePrint, handleExportJson } = composer
+  const {
+    recipes,
+    handlePrint,
+    handleExportJson,
+    handleExportFiringSchedule,
+    scheduleLength,
+    setScheduleLength,
+    scheduleFor,
+  } = composer
 
   return (
     <section className="panel results-panel">
@@ -22,8 +119,27 @@ export function RecipeResultsPanel({ composer }: Props) {
               Export JSON
             </button>
           </div>
+          <div className="schedule-length" role="group" aria-label="Firing schedule length">
+            <span className="schedule-length__label">Firing schedule length</span>
+            <div className="schedule-length__options">
+              {SCHEDULE_LENGTHS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  title={option.hint}
+                  aria-pressed={scheduleLength === option.value}
+                  className={`schedule-length__option${scheduleLength === option.value ? ' schedule-length__option--active' : ''}`}
+                  onClick={() => setScheduleLength(option.value)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="recipe-list">
-            {recipes.map((recipe) => (
+            {recipes.map((recipe) => {
+              const schedule = scheduleFor(recipe)
+              return (
               <article className="recipe-card" key={recipe.name}>
                 <div className="recipe-head">
                   <h3>{recipe.name}</h3>
@@ -38,8 +154,16 @@ export function RecipeResultsPanel({ composer }: Props) {
                     </li>
                   ))}
                 </ul>
+                {schedule && (
+                  <FiringScheduleSection
+                    recipe={recipe}
+                    schedule={schedule}
+                    onExport={handleExportFiringSchedule}
+                  />
+                )}
               </article>
-            ))}
+              )
+            })}
           </div>
         </>
       )}
