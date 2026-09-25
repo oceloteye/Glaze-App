@@ -1,14 +1,14 @@
 package com.glaze.backend.service.recipe;
 
-import com.glaze.backend.dto.GlazeRequest;
 import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import static com.glaze.backend.service.recipe.RecipeIngredients.FERRO_FRIT_3134;
-import static com.glaze.backend.service.recipe.RecipeIngredients.DOLOMITE;
-import static com.glaze.backend.service.recipe.RecipeIngredients.POTASH_FELDSPAR;
+import com.glaze.backend.dto.GlazeRequest;
 import static com.glaze.backend.service.recipe.RecipeIngredients.COLORANT_KEYS;
+import static com.glaze.backend.service.recipe.RecipeIngredients.DOLOMITE;
+import static com.glaze.backend.service.recipe.RecipeIngredients.FERRO_FRIT_3134;
+import static com.glaze.backend.service.recipe.RecipeIngredients.POTASH_FELDSPAR;
 
 public final class RecipeNarrativeBuilder {
 

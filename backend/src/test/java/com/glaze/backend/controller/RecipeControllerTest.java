@@ -53,7 +53,10 @@ class RecipeControllerTest {
                 .andExpect(jsonPath("$.recipes[0].name").isString())
                 .andExpect(jsonPath("$.recipes[0].firingRange").isString())
                 .andExpect(jsonPath("$.recipes[0].ingredients").isMap())
-                .andExpect(jsonPath("$.recipes[0].rationale").isString());
+                .andExpect(jsonPath("$.recipes[0].rationale").isString())
+                .andExpect(jsonPath("$.recipes[0].firingSchedules").isArray())
+                .andExpect(jsonPath("$.recipes[0].firingSchedules[1].length").value("medium"))
+                .andExpect(jsonPath("$.recipes[0].firingSchedules[1].segments").isArray());
     }
 
     @Test

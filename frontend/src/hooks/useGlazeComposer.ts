@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { buildMaterialProfile } from '../lib/glazeMaterialModel'
+import { buildFiringScheduleExport, firingScheduleFileStem, firingScheduleToCsv } from '../lib/firingScheduleExport'
 import { CONES, EFFECTS_WITH_SECONDARY } from '../app/constants'
 import type {
   GenerateRecipesResponse,
@@ -9,6 +10,7 @@ import type {
   RealismSettings,
   RecipeExportPayload,
   RecipeSuggestion,
+  ScheduleLength,
   TempUnit,
 } from '../app/types'
 import { cToF, downloadFile, escapeHtml, formatTimestamp, nearestConeIndex } from '../app/utils'
@@ -51,12 +53,16 @@ export function useGlazeComposer() {
   const [effectIntensity, setEffectIntensity] = useState(50)
   const [activePreviewModal, setActivePreviewModal] = useState<PreviewModalMode>(null)
   const [realismControls, setRealismControls] = useState<RealismSettings>(DEFAULT_REALISM)
+  const [scheduleLength, setScheduleLength] = useState<ScheduleLength>('medium')
 
   const currentEffect = form.effects[0] ?? ''
   const showSecondaryColor = EFFECTS_WITH_SECONDARY.has(currentEffect)
   const coneIndex = useMemo(() => nearestConeIndex(form.firingTempC, CONES), [form.firingTempC])
   const selectedRecipe = recipes[0]
   const hasGeneratedRecipes = recipes.length > 0
+
+  const scheduleFor = (recipe: RecipeSuggestion) =>
+    recipe.firingSchedules?.find((schedule) => schedule.length === scheduleLength) ?? recipe.firingSchedules?.[0]
 
   useEffect(() => {
     if (!activePreviewModal) {
@@ -188,6 +194,7 @@ export function useGlazeComposer() {
         secondaryColor: showSecondaryColor ? secondaryColor : undefined,
         realismControls,
       },
+      scheduleLength,
       recipes,
     }
   }
@@ -231,6 +238,18 @@ export function useGlazeComposer() {
     downloadFile(fileName, JSON.stringify(payload, null, 2), 'application/json;charset=utf-8')
   }
 
+  const handleExportFiringSchedule = (recipe: RecipeSuggestion, format: 'json' | 'csv') => {
+    const schedule = scheduleFor(recipe)
+    if (!schedule) return
+    const doc = buildFiringScheduleExport(recipe, schedule)
+    const stem = firingScheduleFileStem(recipe, schedule)
+    if (format === 'csv') {
+      downloadFile(`${stem}.csv`, firingScheduleToCsv(doc), 'text/csv;charset=utf-8')
+    } else {
+      downloadFile(`${stem}.json`, JSON.stringify(doc, null, 2), 'application/json;charset=utf-8')
+    }
+  }
+
   const handlePrint = () => {
     setError(null)
     const payload = buildExportPayload()
@@ -252,6 +271,34 @@ export function useGlazeComposer() {
           )
           .join('')
 
+        const schedule = scheduleFor(recipe)
+        const scheduleRows = schedule
+          ? schedule.segments
+              .map((segment) => {
+                const rate =
+                  segment.rateCPerHour === null
+                    ? 'Full'
+                    : `${segment.rateCPerHour}°C / ${segment.rateFPerHour}°F per hr`
+                const hold = segment.holdMinutes === 0 ? '—' : `${segment.holdMinutes} min`
+                return `<tr><td>${escapeHtml(segment.phase)}</td><td>${escapeHtml(rate)}</td><td>${segment.targetTempC}°C / ${segment.targetTempF}°F</td><td>${escapeHtml(hold)}</td><td>${escapeHtml(segment.note)}</td></tr>`
+              })
+              .join('')
+          : ''
+        const scheduleNotes = schedule
+          ? schedule.notes.map((note) => `<li>${escapeHtml(note)}</li>`).join('')
+          : ''
+        const scheduleHtml = schedule
+          ? `
+            <h4>Recommended firing schedule (${escapeHtml(schedule.length)}) — cone ${escapeHtml(schedule.cone)}, ${escapeHtml(schedule.atmosphere)}, ${escapeHtml(schedule.coolingStrategy)}</h4>
+            <p class="notes">~${schedule.estimatedHours} h total: ${schedule.heatingHours} h heating (to end of soak) + ${schedule.coolingHours} h cooling to 150°C</p>
+            <table>
+              <thead><tr><th>Phase</th><th>Rate</th><th>Target</th><th>Hold</th><th>Note</th></tr></thead>
+              <tbody>${scheduleRows}</tbody>
+            </table>
+            <ul class="notes">${scheduleNotes}</ul>
+          `
+          : ''
+
         return `
           <section class="recipe">
             <h3>${escapeHtml(recipe.name)}</h3>
@@ -261,6 +308,7 @@ export function useGlazeComposer() {
               <thead><tr><th>Ingredient</th><th>Percent</th></tr></thead>
               <tbody>${ingredients}</tbody>
             </table>
+            ${scheduleHtml}
           </section>
         `
       })
@@ -278,8 +326,10 @@ export function useGlazeComposer() {
           h1 { font-size: 26px; }
           h2 { margin-top: 24px; font-size: 20px; }
           h3 { font-size: 18px; }
+          h4 { font-size: 15px; margin: 14px 0 4px; }
           p { margin: 0 0 10px; line-height: 1.45; }
           .meta { color: #5f4b3f; margin-bottom: 18px; }
+          .notes { margin: 6px 0 0; padding-left: 18px; font-size: 13px; color: #5f4b3f; }
           table { width: 100%; border-collapse: collapse; margin-top: 8px; }
           th, td { text-align: left; border: 1px solid #d7c8bb; padding: 6px 8px; font-size: 14px; }
           th { background: #f6eee6; }
@@ -371,6 +421,9 @@ export function useGlazeComposer() {
     setActivePreviewModal,
     realismControls,
     setRealismControls,
+    scheduleLength,
+    setScheduleLength,
+    scheduleFor,
     currentEffect,
     showSecondaryColor,
     coneIndex,
@@ -384,6 +437,7 @@ export function useGlazeComposer() {
     handleSubmit,
     handlePrint,
     handleExportJson,
+    handleExportFiringSchedule,
     openPreview,
     closePreview,
   }
