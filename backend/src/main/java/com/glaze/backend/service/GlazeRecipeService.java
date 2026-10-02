@@ -7,6 +7,7 @@ import com.glaze.backend.service.recipe.RecipeBaseFactory;
 import com.glaze.backend.service.recipe.RecipeMath;
 import com.glaze.backend.service.recipe.RecipeModifier;
 import com.glaze.backend.service.recipe.RecipeNarrativeBuilder;
+import com.glaze.backend.service.recipe.UmfCalculator;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -42,6 +43,7 @@ public class GlazeRecipeService {
                 RecipeNarrativeBuilder.firingRangeFor(req.firingTempC()),
                 formula,
                 RecipeNarrativeBuilder.buildRationale(variant, req, formula),
+                UmfCalculator.calculate(formula),
                 FiringScheduleBuilder.buildAll(variant, req, formula));
     }
 }

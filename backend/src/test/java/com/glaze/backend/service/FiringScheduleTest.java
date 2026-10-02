@@ -43,7 +43,7 @@ class FiringScheduleTest {
         var recipes = service.generateRecipes(request(1222, "Satin", List.of(), null, null));
         assertThat(recipes).hasSize(3);
         for (var recipe : recipes) {
-            assertThat(recipe.firingSchedules()).extracting(FiringSchedule::length).containsExactly("short", "medium", "long");
+            assertThat(recipe.firingSchedules()).extracting(FiringSchedule::length).containsExactly("very-short", "short", "medium", "long");
             var schedule = medium(recipe);
             assertThat(schedule).isNotNull();
             assertThat(schedule.cone()).isEqualTo("6");
@@ -59,17 +59,29 @@ class FiringScheduleTest {
     @Test
     void lengthsOrderTotalTimeAndSoak() {
         var recipe = variant(service.generateRecipes(request(1222, "Satin", List.of(), null, null)), "Balanced");
+        var veryShort = ofLength(recipe, "very-short");
         var shortS = ofLength(recipe, "short");
         var mediumS = ofLength(recipe, "medium");
         var longS = ofLength(recipe, "long");
 
+        assertThat(veryShort.estimatedHours()).isLessThan(shortS.estimatedHours());
         assertThat(shortS.estimatedHours()).isLessThan(mediumS.estimatedHours());
         assertThat(mediumS.estimatedHours()).isLessThan(longS.estimatedHours());
+        assertThat(peakSegment(veryShort).holdMinutes()).isLessThanOrEqualTo(peakSegment(shortS).holdMinutes());
         assertThat(peakSegment(shortS).holdMinutes()).isLessThan(peakSegment(mediumS).holdMinutes());
         assertThat(peakSegment(mediumS).holdMinutes()).isLessThan(peakSegment(longS).holdMinutes());
         assertThat(peakSegment(shortS).targetTempC()).isEqualTo(1222);
         assertThat(peakSegment(longS).targetTempC()).isEqualTo(1222);
         assertThat(longS.coolingStrategy()).isEqualTo("Controlled cool");
+    }
+
+    @Test
+    void veryShortHeatsToPeakInAboutFourHours() {
+        for (int peak : new int[] {999, 1222, 1280}) {
+            var schedule = ofLength(variant(service.generateRecipes(request(peak, "Glossy", List.of(), null, null)), "Balanced"), "very-short");
+            assertThat(schedule.heatingHours()).as("peak %d", peak).isBetween(3.0, 4.5);
+            assertThat(peakSegment(schedule).targetTempC()).isEqualTo(peak);
+        }
     }
 
     @Test

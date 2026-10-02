@@ -26,7 +26,7 @@ export type FiringSegment = {
   note: string
 }
 
-export type ScheduleLength = 'short' | 'medium' | 'long'
+export type ScheduleLength = 'very-short' | 'short' | 'medium' | 'long'
 
 export type FiringSchedule = {
   length: ScheduleLength
@@ -42,11 +42,21 @@ export type FiringSchedule = {
   notes: string[]
 }
 
+export type Umf = {
+  fluxes: Record<string, number>
+  stabilizers: Record<string, number>
+  glassFormers: Record<string, number>
+  colorants: Record<string, number>
+  siAlRatio: number
+  r2oShare: number
+}
+
 export type RecipeSuggestion = {
   name: string
   firingRange: string
   ingredients: Record<string, number>
   rationale: string
+  umf: Umf
   firingSchedules: FiringSchedule[]
 }
 

@@ -19,11 +19,13 @@ public final class FiringScheduleBuilder {
 
     /** Overall firing length. Rates, soaks and cooling windows scale with it. */
     public enum Length {
-        SHORT("short", 200, 150, 1.6, 0.5, 120, 90, false),
-        MEDIUM("medium", 150, 120, 1.0, 1.0, 80, 180, false),
-        LONG("long", 100, 90, 0.75, 2.0, 50, 300, true);
+        VERY_SHORT("very-short", 200, 350, 250, 2.0, 0.25, 150, 60, false),
+        SHORT("short", 100, 200, 150, 1.6, 0.5, 120, 90, false),
+        MEDIUM("medium", 100, 150, 120, 1.0, 1.0, 80, 180, false),
+        LONG("long", 100, 100, 90, 0.75, 2.0, 50, 300, true);
 
         final String label;
+        final int preheatRate;
         final int mainRateOxidation;
         final int mainRateReduction;
         final double finalRateFactor;
@@ -32,9 +34,10 @@ public final class FiringScheduleBuilder {
         final int crystalHoldMinutes;
         final boolean controlledCoolForGlossy;
 
-        Length(String label, int mainRateOxidation, int mainRateReduction, double finalRateFactor,
+        Length(String label, int preheatRate, int mainRateOxidation, int mainRateReduction, double finalRateFactor,
                double holdFactor, int slowCoolRate, int crystalHoldMinutes, boolean controlledCoolForGlossy) {
             this.label = label;
+            this.preheatRate = preheatRate;
             this.mainRateOxidation = mainRateOxidation;
             this.mainRateReduction = mainRateReduction;
             this.finalRateFactor = finalRateFactor;
@@ -70,6 +73,7 @@ public final class FiringScheduleBuilder {
 
     public static List<FiringSchedule> buildAll(String variant, GlazeRequest request, Map<String, Double> formula) {
         return List.of(
+                build(variant, request, formula, Length.VERY_SHORT),
                 build(variant, request, formula, Length.SHORT),
                 build(variant, request, formula, Length.MEDIUM),
                 build(variant, request, formula, Length.LONG));
@@ -101,7 +105,7 @@ public final class FiringScheduleBuilder {
         var notes = new ArrayList<String>();
 
         int preheatHold = length == Length.LONG ? 30 : 0;
-        segments.add(segment(PHASE_HEAT, 100, Math.min(120, peak), preheatHold,
+        segments.add(segment(PHASE_HEAT, length.preheatRate, Math.min(120, peak), preheatHold,
                 preheatHold > 0
                         ? "Gentle start with a candling hold to fully dry the glaze coat"
                         : "Gentle start to drive off moisture from the glaze coat"));
@@ -182,6 +186,7 @@ public final class FiringScheduleBuilder {
             notes.add("Frit-based low-fire glaze matures quickly; avoid overfiring by more than one cone.");
         }
         switch (length) {
+            case VERY_SHORT -> notes.add("Very short schedule: ~4 h to peak suits small electric kilns and thin, bone-dry test tiles; confirm your kiln can sustain the main ramp, and expect muted colour development and a higher pinhole/crawl risk.");
             case SHORT -> notes.add("Short schedule: faster ramps suit thin-walled, well-dried work; expect slightly less colour development and a higher pinhole risk.");
             case LONG -> notes.add("Long schedule: slow ramps and extended soaks favour thick or large pieces and give the fullest melt and surface development.");
             default -> { }

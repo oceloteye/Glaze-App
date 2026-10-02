@@ -8,6 +8,7 @@ public record RecipeSuggestion(
         String firingRange,
         Map<String, Double> ingredients,
         String rationale,
+        Umf umf,
         List<FiringSchedule> firingSchedules
 ) {
 }
