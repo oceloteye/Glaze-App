@@ -56,7 +56,20 @@ public final class RecipeNarrativeBuilder {
             String effectNames = request.effects().stream()
                     .map(RecipeNarrativeBuilder::effectNote)
                     .collect(Collectors.joining("; "));
-            rationale.append(effectNames).append('.');
+            rationale.append(effectNames).append(". ");
+        }
+
+        if (RecipeModifier.isFluidStability(request.stability())) {
+            rationale.append("Fluid melt target: Lithium Carbonate and Wollastonite raise flux activity so the glaze moves and pools. ");
+        } else if (RecipeModifier.isStiffStability(request.stability())) {
+            rationale.append("Stiff melt target: extra Kaolin and Bentonite hold the glaze in place on vertical surfaces. ");
+        }
+
+        String opacity = request.opacity() == null ? "" : request.opacity().toLowerCase(Locale.ROOT);
+        if (opacity.contains("transluc") || opacity.contains("transparent")) {
+            rationale.append("Elevated Silica promotes a translucent, glassy quality. ");
+        } else if (opacity.contains("opaque") && !opacity.contains("semi")) {
+            rationale.append("Zircopax and Tin Oxide opacify the glaze to a dense, covering surface. ");
         }
 
         if (Boolean.TRUE.equals(request.foodSafe())) {
@@ -96,9 +109,6 @@ public final class RecipeNarrativeBuilder {
         if (normalized.contains("crystal")) return "High Zinc Oxide and Titanium Dioxide nucleate macro-crystalline growth";
         if (normalized.contains("varieg")) return "Rutile promotes colour movement and variegation in the melt";
         if (normalized.contains("flame")) return "Titanium Dioxide and Iron Chromate drive phase-separation flashing";
-        if (normalized.contains("melt")) return "Lithium Carbonate and Wollastonite increase flux activity for a fluid run";
-        if (normalized.contains("opaque")) return "Zircopax and Tin Oxide create a dense opaque white";
-        if (normalized.contains("transluc")) return "Elevated Silica promotes a translucent, glassy quality";
         return effect + " effect applied";
     }
 

@@ -1,13 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
-import { buildMaterialProfile } from '../lib/glazeMaterialModel'
 import { buildFiringScheduleExport, firingScheduleFileStem, firingScheduleToCsv } from '../lib/firingScheduleExport'
 import { CONES, EFFECTS_WITH_SECONDARY } from '../app/constants'
 import type {
   GenerateRecipesResponse,
   GlazeRequest,
-  PreviewModalMode,
-  RealismSettings,
   RecipeExportPayload,
   RecipeSuggestion,
   ScheduleLength,
@@ -29,6 +26,7 @@ const DEFAULT_FORM: GlazeRequest = {
   firingTempC: 1222,
   surfaceFinish: 'Satin',
   stability: 'High',
+  opacity: 'Semi-opaque',
   effects: [],
   feldsparSubstitute: 'Potash Feldspar',
   colorCharacter: 'Natural',
@@ -36,21 +34,7 @@ const DEFAULT_FORM: GlazeRequest = {
   foodSafe: true,
 }
 
-const DEFAULT_REALISM: RealismSettings = {
-  clayBody: 'White Stoneware',
-  thickness: 'Medium',
-  atmosphere: 'Oxidation',
-  cooling: 'Normal',
-  lighting: 'Studio Neutral',
-}
-
 export function useGlazeComposer() {
-  const openRealisticButtonRef = useRef<HTMLButtonElement | null>(null)
-  const openAiButtonRef = useRef<HTMLButtonElement | null>(null)
-  const modalPanelRef = useRef<HTMLDivElement | null>(null)
-  const lastOpenedPreviewRef = useRef<'realistic' | 'ai' | null>(null)
-  const wasModalOpenRef = useRef(false)
-
   const [form, setForm] = useState<GlazeRequest>(DEFAULT_FORM)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -60,8 +44,6 @@ export function useGlazeComposer() {
   const [secondaryColor, setSecondaryColor] = useState('#808080')
   const [secondaryHexInput, setSecondaryHexInput] = useState('#808080')
   const [effectIntensity, setEffectIntensity] = useState(50)
-  const [activePreviewModal, setActivePreviewModal] = useState<PreviewModalMode>(null)
-  const [realismControls, setRealismControls] = useState<RealismSettings>(DEFAULT_REALISM)
   const [scheduleLength, setScheduleLength] = useState<ScheduleLength>('medium')
 
   const currentEffect = form.effects[0] ?? ''
@@ -72,117 +54,6 @@ export function useGlazeComposer() {
 
   const scheduleFor = (recipe: RecipeSuggestion) =>
     recipe.firingSchedules?.find((schedule) => schedule.length === scheduleLength) ?? recipe.firingSchedules?.[0]
-
-  useEffect(() => {
-    if (!activePreviewModal) {
-      if (wasModalOpenRef.current) {
-        if (lastOpenedPreviewRef.current === 'ai') {
-          openAiButtonRef.current?.focus()
-        } else {
-          openRealisticButtonRef.current?.focus()
-        }
-        wasModalOpenRef.current = false
-      }
-      return
-    }
-
-    wasModalOpenRef.current = true
-
-    const panel = modalPanelRef.current
-    if (!panel) return
-
-    const getFocusable = () =>
-      Array.from(
-        panel.querySelectorAll<HTMLElement>(
-          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-        ),
-      ).filter((element) => !element.hasAttribute('disabled') && element.getAttribute('aria-hidden') !== 'true')
-
-    const focusable = getFocusable()
-    ;(focusable[0] ?? panel).focus()
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        event.preventDefault()
-        setActivePreviewModal(null)
-        return
-      }
-
-      if (event.key !== 'Tab') return
-
-      const items = getFocusable()
-      if (items.length === 0) {
-        event.preventDefault()
-        panel.focus()
-        return
-      }
-
-      const first = items[0]
-      const last = items[items.length - 1]
-      const active = document.activeElement as HTMLElement | null
-
-      if (event.shiftKey && active === first) {
-        event.preventDefault()
-        last.focus()
-      } else if (!event.shiftKey && active === last) {
-        event.preventDefault()
-        first.focus()
-      }
-    }
-
-    document.addEventListener('keydown', onKeyDown)
-    return () => {
-      document.removeEventListener('keydown', onKeyDown)
-    }
-  }, [activePreviewModal])
-
-  useEffect(() => {
-    if (!hasGeneratedRecipes && activePreviewModal) {
-      setActivePreviewModal(null)
-    }
-  }, [activePreviewModal, hasGeneratedRecipes])
-
-  const materialProfile = useMemo(
-    () =>
-      buildMaterialProfile({
-        color: form.color,
-        secondaryColor: showSecondaryColor ? secondaryColor : undefined,
-        surfaceFinish: form.surfaceFinish,
-        effect: form.effects[0] ?? 'None',
-        intensity: effectIntensity,
-        firingTempC: form.firingTempC,
-        stability: form.stability,
-        foodSafe: Boolean(form.foodSafe),
-        recipeIngredients: selectedRecipe?.ingredients,
-        controls: realismControls,
-      }),
-    [
-      effectIntensity,
-      form.color,
-      form.effects,
-      form.firingTempC,
-      form.foodSafe,
-      form.stability,
-      form.surfaceFinish,
-      realismControls,
-      secondaryColor,
-      selectedRecipe?.ingredients,
-      showSecondaryColor,
-    ],
-  )
-
-  const previewSeedKey = useMemo(
-    () =>
-      JSON.stringify({
-        recipe: selectedRecipe?.name ?? 'none',
-        ingredients: selectedRecipe?.ingredients ?? {},
-        controls: realismControls,
-        form,
-        effectIntensity,
-        secondaryColor: showSecondaryColor ? secondaryColor : null,
-      }),
-    [effectIntensity, form, realismControls, secondaryColor, selectedRecipe?.ingredients, selectedRecipe?.name, showSecondaryColor],
-  )
 
   const buildExportPayload = (): RecipeExportPayload => {
     const effect = form.effects[0] ?? 'None'
@@ -195,13 +66,13 @@ export function useGlazeComposer() {
         cone: CONES[coneIndex].name,
         surfaceFinish: form.surfaceFinish,
         stability: form.stability,
+        opacity: form.opacity,
         feldsparSubstitute: form.feldsparSubstitute ?? 'Potash Feldspar',
         colorCharacter: form.colorCharacter ?? 'Natural',
         foodSafe: form.foodSafe ? 'Yes' : 'No',
         effect,
         intensity: effect === 'None' ? undefined : effectIntensity,
         secondaryColor: showSecondaryColor ? secondaryColor : undefined,
-        realismControls,
       },
       scheduleLength,
       recipes,
@@ -426,16 +297,6 @@ export function useGlazeComposer() {
     }, 150)
   }
 
-  const openPreview = (mode: 'realistic' | 'ai') => {
-    if (!hasGeneratedRecipes) return
-    lastOpenedPreviewRef.current = mode
-    setActivePreviewModal(mode)
-  }
-
-  const closePreview = () => {
-    setActivePreviewModal(null)
-  }
-
   return {
     form,
     setForm,
@@ -453,10 +314,6 @@ export function useGlazeComposer() {
     setSecondaryHexInput,
     effectIntensity,
     setEffectIntensity,
-    activePreviewModal,
-    setActivePreviewModal,
-    realismControls,
-    setRealismControls,
     scheduleLength,
     setScheduleLength,
     scheduleFor,
@@ -465,17 +322,10 @@ export function useGlazeComposer() {
     coneIndex,
     selectedRecipe,
     hasGeneratedRecipes,
-    materialProfile,
-    previewSeedKey,
-    openAiButtonRef,
-    openRealisticButtonRef,
-    modalPanelRef,
     handleSubmit,
     handlePrint,
     handleExportJson,
     handleExportFiringSchedule,
-    openPreview,
-    closePreview,
   }
 }
 

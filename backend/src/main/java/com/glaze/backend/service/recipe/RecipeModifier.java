@@ -66,17 +66,42 @@ public final class RecipeModifier {
         }
     }
 
+    public static boolean isFluidStability(String stability) {
+        String normalized = stability == null ? "" : stability.toLowerCase(Locale.ROOT);
+        return normalized.contains("low") || normalized.contains("fluid");
+    }
+
+    public static boolean isStiffStability(String stability) {
+        String normalized = stability == null ? "" : stability.toLowerCase(Locale.ROOT);
+        return normalized.contains("high") || normalized.contains("stiff");
+    }
+
     public static void applyStabilityAdjustments(Map<String, Double> formula, String stability) {
-        String normalized = stability.toLowerCase(Locale.ROOT);
-        if (normalized.contains("high")) {
+        if (isStiffStability(stability)) {
             RecipeMath.adjust(formula, EPK_KAOLIN, 2.0);
             RecipeMath.adjust(formula, BENTONITE, 0.5);
             RecipeMath.adjust(formula, SILICA, -1.5);
             RecipeMath.adjustIfPresent(formula, "Whiting", -1.0);
-        } else if (normalized.contains("low")) {
+        } else if (isFluidStability(stability)) {
             RecipeMath.adjust(formula, SILICA, 1.5);
             RecipeMath.adjust(formula, EPK_KAOLIN, -1.5);
             RecipeMath.adjust(formula, BENTONITE, -0.5);
+            RecipeMath.adjust(formula, LITHIUM_CARBONATE, 1.5);
+            RecipeMath.adjust(formula, WOLLASTONITE, 1.0);
+            RecipeMath.adjustIfPresent(formula, POTASH_FELDSPAR, -1.0);
+        }
+    }
+
+    public static void applyOpacityAdjustments(Map<String, Double> formula, String opacity) {
+        String normalized = opacity == null ? "" : opacity.toLowerCase(Locale.ROOT);
+        if (normalized.contains("transluc") || normalized.contains("transparent")) {
+            RecipeMath.adjust(formula, SILICA, 2.5);
+            RecipeMath.adjustIfPresent(formula, EPK_KAOLIN, -1.5);
+        } else if (normalized.contains("semi")) {
+            return;
+        } else if (normalized.contains("opaque")) {
+            RecipeMath.adjust(formula, ZIRCOPAX, 4.0);
+            RecipeMath.adjust(formula, TIN_OXIDE, 1.5);
         }
     }
 
@@ -127,16 +152,6 @@ public final class RecipeModifier {
                 RecipeMath.adjust(formula, TITANIUM_DIOXIDE, RecipeMath.clamp(2.5 * t));
                 RecipeMath.adjust(formula, IRON_CHROMATE, RecipeMath.clamp(1.2 * t));
                 RecipeMath.adjust(formula, COPPER_CARBONATE, RecipeMath.clamp(0.8 * t));
-            } else if (effect.contains("melt")) {
-                RecipeMath.adjust(formula, LITHIUM_CARBONATE, RecipeMath.clamp(3.0 * t));
-                RecipeMath.adjust(formula, WOLLASTONITE, RecipeMath.clamp(2.0 * t));
-                RecipeMath.adjustIfPresent(formula, POTASH_FELDSPAR, -RecipeMath.clamp(1.5 * t));
-            } else if (effect.contains("opaque")) {
-                RecipeMath.adjust(formula, ZIRCOPAX, RecipeMath.clamp(6.0 * t));
-                RecipeMath.adjust(formula, TIN_OXIDE, RecipeMath.clamp(2.5 * t));
-            } else if (effect.contains("transluc")) {
-                RecipeMath.adjust(formula, SILICA, RecipeMath.clamp(3.5 * t));
-                RecipeMath.adjustIfPresent(formula, EPK_KAOLIN, -RecipeMath.clamp(2.0 * t));
             }
         }
     }

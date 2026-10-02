@@ -16,7 +16,7 @@ class FiringScheduleTest {
     private final GlazeRecipeService service = new GlazeRecipeService();
 
     private static GlazeRequest request(int tempC, String finish, List<String> effects, String atmosphere, Boolean foodSafe) {
-        return new GlazeRequest("#3a6bc1", tempC, finish, "Medium", effects, 50, null, null, null, atmosphere, foodSafe);
+        return new GlazeRequest("#3a6bc1", tempC, finish, "Medium", null, effects, 50, null, null, null, atmosphere, foodSafe);
     }
 
     private static RecipeSuggestion variant(List<RecipeSuggestion> recipes, String label) {

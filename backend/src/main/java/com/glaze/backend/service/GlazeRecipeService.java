@@ -32,6 +32,7 @@ public class GlazeRecipeService {
 
         RecipeModifier.applySurfaceAdjustments(formula, req.surfaceFinish(), req.firingTempC());
         RecipeModifier.applyStabilityAdjustments(formula, req.stability());
+        RecipeModifier.applyOpacityAdjustments(formula, req.opacity());
         RecipeModifier.applyColorants(formula, req.color(), req.secondaryColor(), req.colorCharacter(), req.firingTempC(), req.atmosphere());
         RecipeModifier.applyEffectAgents(formula, req.effects(), intensity, req.color(), req.secondaryColor(), req.firingTempC(), req.atmosphere());
         RecipeModifier.applyFeldsparSubstitution(formula, req.feldsparSubstitute());

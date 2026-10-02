@@ -35,25 +35,30 @@ export const CONES: { name: string; tempC: number }[] = [
 
 export const SURFACE_FINISHES = ['Matte', 'Satin', 'Glossy'] as const
 
+/** Backend values with the melt-behaviour labels shown in the form. */
+export const STABILITY_STOPS = [
+  { value: 'High', label: 'Stiff' },
+  { value: 'Medium', label: 'Balanced' },
+  { value: 'Low', label: 'Fluid' },
+] as const
+
+export const OPACITY_STOPS = ['Translucent', 'Semi-opaque', 'Opaque'] as const
+
 export const EFFECTS = [
   { label: 'None', value: '' },
   { label: 'Speckled', value: 'Speckled' },
   { label: 'Crystalline', value: 'Crystalline' },
   { label: 'Variegated', value: 'Variegated' },
   { label: 'Flame', value: 'Flame' },
-  { label: 'Melt', value: 'Melt' },
-  { label: 'Opaque', value: 'Opaque' },
-  { label: 'Translucent', value: 'Translucent' },
 ] as const
 
-export const EFFECTS_WITH_SECONDARY = new Set(['Speckled', 'Crystalline', 'Variegated', 'Flame', 'Melt'])
+export const EFFECTS_WITH_SECONDARY = new Set(['Speckled', 'Crystalline', 'Variegated', 'Flame'])
 
 export const SECONDARY_COLOR_LABEL: Record<string, string> = {
   Speckled: 'Speckle color',
   Crystalline: 'Crystal color',
   Variegated: 'Streak color',
   Flame: 'Flame color',
-  Melt: 'Melt color',
 }
 
 export const CLAY_BODY_OPTIONS = ['Porcelain', 'White Stoneware', 'Buff Stoneware', 'Iron-rich Stoneware'] as const

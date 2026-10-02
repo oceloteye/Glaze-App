@@ -10,8 +10,15 @@ interface Props {
   selectedRecipeName?: string
   firingTempC?: number
   stability?: string
+  opacity?: string
   foodSafe?: boolean
+  coneLabel?: string
+  atmosphere?: string
 }
+
+const PREVIEW_SIZE = 240
+const TILE_CORNER = 22
+const TILE_RGB = { r: 226, g: 211, b: 190 }
 
 type IngredientMap = Record<string, number>
 
@@ -59,6 +66,7 @@ function deriveChemistry(
   ingredients: IngredientMap | undefined,
   firingTempC: number,
   stability: string,
+  opacityTarget: string,
   foodSafe: boolean,
 ) {
   const silica = ingredientTotal(ingredients, ['Silica', 'Flint', 'Quartz'])
@@ -95,11 +103,15 @@ function deriveChemistry(
 
   const stabilityBias = stability === 'Low' ? 0.12 : stability === 'Medium' ? 0.05 : -0.04
   const foodSafeBias = foodSafe ? -0.08 : 0
+  const opacityBias = opacityTarget === 'Opaque' ? 0.3 : opacityTarget === 'Translucent' ? -0.2 : 0
+  // how far the glaze will move in the kiln: the stability target dominates, recipe chemistry nudges it
+  const stabilityMelt = stability === 'Low' ? 0.85 : stability === 'Medium' ? 0.4 : 0.08
 
   return {
     flow: clamp(flow + stabilityBias + foodSafeBias, 0.05, 1),
+    melt: clamp(stabilityMelt + (flow - 0.5) * 0.3, 0, 1),
     gloss: clamp(chemistryGloss - (foodSafe ? 0.05 : 0), 0, 1),
-    opacity: clamp(opacity + (foodSafe ? 0.03 : 0), 0, 1),
+    opacity: clamp(opacity + opacityBias + (foodSafe ? 0.03 : 0), 0, 1),
     speckle,
     crystal,
     variegation,
@@ -109,6 +121,215 @@ function deriveChemistry(
 
 function zincOrTitaniaHint(ingredients: IngredientMap | undefined) {
   return ingredientTotal(ingredients, ['Zinc Oxide', 'Titanium Dioxide', 'Rutile'])
+}
+
+type Rgb = { r: number; g: number; b: number }
+type Rgba = [number, number, number, number]
+
+/** Smooth 2D value noise on a seeded, wrapping lattice with fBm octaves. Inputs in unit space. */
+function makeNoise(rng: () => number, grid: number) {
+  const lattice = new Float32Array(grid * grid)
+  for (let i = 0; i < lattice.length; i++) lattice[i] = rng()
+  const fade = (v: number) => v * v * (3 - 2 * v)
+  const at = (ix: number, iy: number) =>
+    lattice[(((iy % grid) + grid) % grid) * grid + (((ix % grid) + grid) % grid)]
+  const sample = (x: number, y: number) => {
+    const gx = x * grid
+    const gy = y * grid
+    const x0 = Math.floor(gx)
+    const y0 = Math.floor(gy)
+    const fx = fade(gx - x0)
+    const fy = fade(gy - y0)
+    const top = at(x0, y0) + (at(x0 + 1, y0) - at(x0, y0)) * fx
+    const bottom = at(x0, y0 + 1) + (at(x0 + 1, y0 + 1) - at(x0, y0 + 1)) * fx
+    return top + (bottom - top) * fy
+  }
+  return (x: number, y: number, octaves: number) => {
+    let value = 0
+    let amplitude = 0.5
+    let frequency = 1
+    let total = 0
+    for (let o = 0; o < octaves; o++) {
+      value += sample(x * frequency, y * frequency) * amplitude
+      total += amplitude
+      amplitude *= 0.5
+      frequency *= 2
+    }
+    return value / total
+  }
+}
+
+/** Rasterises `shade` onto a small offscreen canvas; drawn scaled up so it is smoothed for free. */
+function noiseLayer(size: number, shade: (x: number, y: number) => Rgba) {
+  const layer = document.createElement('canvas')
+  layer.width = size
+  layer.height = size
+  const lctx = layer.getContext('2d')
+  if (!lctx) return null
+  const image = lctx.createImageData(size, size)
+  const data = image.data
+  for (let py = 0; py < size; py++) {
+    for (let px = 0; px < size; px++) {
+      const [cr, cg, cb, ca] = shade((px + 0.5) / size, (py + 0.5) / size)
+      const i = (py * size + px) * 4
+      data[i] = cr
+      data[i + 1] = cg
+      data[i + 2] = cb
+      data[i + 3] = Math.round(clamp(ca, 0, 1) * 255)
+    }
+  }
+  lctx.putImageData(image, 0, 0)
+  return layer
+}
+
+function paintLayer(ctx: CanvasRenderingContext2D, layer: HTMLCanvasElement | null, w: number, h: number) {
+  if (layer) ctx.drawImage(layer, 0, 0, w, h)
+}
+
+/** A run hanging off the bottom of the dab: centre offset from cx, half-width and depth, all in px. */
+type Lobe = { x: number; w: number; d: number }
+
+/** Extra sag of the lower outline at horizontal offset `dx` from the centre. */
+function lobeDepth(lobes: Lobe[], dx: number) {
+  let d = 0
+  for (const l of lobes) {
+    const u = (dx - l.x) / l.w
+    if (Math.abs(u) > 3.2) continue
+    // flat-bottomed tongue with a long, shallow tail so it fillets into the pool
+    d += l.d * (0.8 * Math.exp(-1.2 * u * u * u * u) + 0.2 * Math.exp(-(u * u) / 3.24))
+  }
+  return d
+}
+
+/** Lower outline of the dab sampled left→right, including sag and any runs. */
+function lowerEdge(cx: number, cy: number, radius: number, sag: number, lobes: Lobe[]) {
+  const steps = 96
+  const pts: { x: number; y: number }[] = []
+  for (let i = 0; i <= steps; i++) {
+    const dx = -radius + (2 * radius * i) / steps
+    const base = Math.sqrt(Math.max(0, radius * radius - dx * dx)) * (1 + sag)
+    // runs fade out toward the sides so the outline still meets the circle cleanly
+    const sideFade = clamp(1 - Math.pow(Math.abs(dx) / radius, 6), 0, 1)
+    pts.push({ x: cx + dx, y: cy + base + lobeDepth(lobes, dx) * sideFade })
+  }
+  return pts
+}
+
+/** A few runs of mixed size: one hero, one medium, and short lobes that barely leave the pool. */
+function makeLobes(radius: number, melt: number, flow: number, maxDepth: number, rng: () => number) {
+  const count = 3 + Math.round(rng() * 1.5 + flow)
+  const span = 1.3
+  const slot = span / count
+  const order = Array.from({ length: count }, (_, i) => i).sort(() => rng() - 0.5)
+  const push = melt * (0.8 + flow * 0.4)
+  return order.map<Lobe>((i, k) => {
+    const x = (-span / 2 + slot * (i + 0.15 + rng() * 0.7)) * radius
+    const w = radius * (0.09 + rng() * 0.09) * (k === 0 ? 1.25 : 1)
+    const reach = k === 0 ? 0.42 + rng() * 0.22 : k === 1 ? 0.16 + rng() * 0.14 : 0.03 + rng() * 0.08
+    return { x, w, d: Math.min(maxDepth, radius * reach * push) }
+  })
+}
+
+/** Thick-glass shading for each run: deeper tone toward the tip, lit shoulder, dark meniscus. */
+function shadeLobes(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  radius: number,
+  sag: number,
+  lobes: Lobe[],
+  gloss: number,
+) {
+  for (const l of lobes) {
+    if (l.d < radius * 0.05) continue
+    const ax = cx + l.x
+    const edgeY = cy + Math.sqrt(Math.max(0, radius * radius - l.x * l.x)) * (1 + sag)
+    const tipY = edgeY + lobeDepth(lobes, l.x)
+    const span = tipY - edgeY
+    // glass thickens toward the tip
+    const body = ctx.createLinearGradient(0, edgeY - l.w * 0.5, 0, tipY)
+    body.addColorStop(0, 'rgba(0,0,0,0)')
+    body.addColorStop(0.65, 'rgba(0,0,0,0.08)')
+    body.addColorStop(1, 'rgba(0,0,0,0.26)')
+    ctx.fillStyle = body
+    ctx.fillRect(ax - l.w * 2.6, edgeY - l.w * 0.5, l.w * 5.2, span + l.w)
+    // rounded sides: shade the flank away from the light, lift the one toward it
+    const flank = ctx.createLinearGradient(ax - l.w * 1.1, 0, ax + l.w * 1.1, 0)
+    flank.addColorStop(0, 'rgba(255,255,255,0.08)')
+    flank.addColorStop(0.35, 'rgba(255,255,255,0)')
+    flank.addColorStop(0.7, 'rgba(0,0,0,0)')
+    flank.addColorStop(1, 'rgba(0,0,0,0.22)')
+    ctx.fillStyle = flank
+    ctx.fillRect(ax - l.w * 1.1, edgeY + l.w * 0.2, l.w * 2.2, span)
+    // lit shoulder on the swelling tip
+    const hl = ctx.createRadialGradient(ax - l.w * 0.3, tipY - l.w * 0.95, 0, ax - l.w * 0.2, tipY - l.w * 0.8, l.w * 0.9)
+    hl.addColorStop(0, `rgba(255,255,255,${0.14 + gloss * 0.3})`)
+    hl.addColorStop(1, 'rgba(255,255,255,0)')
+    ctx.fillStyle = hl
+    ctx.fillRect(ax - l.w * 1.5, tipY - l.w * 2, l.w * 3, l.w * 2)
+    // meniscus: the underside of the bead goes dark
+    const men = ctx.createLinearGradient(0, tipY - l.w * 0.7, 0, tipY)
+    men.addColorStop(0, 'rgba(0,0,0,0)')
+    men.addColorStop(1, 'rgba(0,0,0,0.38)')
+    ctx.fillStyle = men
+    ctx.fillRect(ax - l.w * 1.6, tipY - l.w * 0.7, l.w * 3.2, l.w * 0.7)
+  }
+}
+
+/** Glaze dab outline; `sag` stretches the lower half so a fluid melt visibly slumps, `lobes` hang runs off it. */
+function discPath(ctx: CanvasRenderingContext2D, cx: number, cy: number, radius: number, sag: number, lobes: Lobe[] = []) {
+  ctx.beginPath()
+  ctx.arc(cx, cy, radius, Math.PI, 0)
+  if (lobes.length === 0) {
+    ctx.ellipse(cx, cy, radius, radius * (1 + sag), 0, 0, Math.PI)
+  } else {
+    const edge = lowerEdge(cx, cy, radius, sag, lobes)
+    for (let i = edge.length - 1; i >= 0; i--) ctx.lineTo(edge[i].x, edge[i].y)
+  }
+  ctx.closePath()
+}
+
+function roundedRectPath(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+  ctx.beginPath()
+  ctx.moveTo(x + r, y)
+  ctx.arcTo(x + w, y, x + w, y + h, r)
+  ctx.arcTo(x + w, y + h, x, y + h, r)
+  ctx.arcTo(x, y + h, x, y, r)
+  ctx.arcTo(x, y, x + w, y, r)
+  ctx.closePath()
+}
+
+/** Bisque tile the glaze sits on: warm buff gradient with a light grog speckle. */
+function drawTile(ctx: CanvasRenderingContext2D, w: number, h: number, rng: () => number) {
+  roundedRectPath(ctx, 0, 0, w, h, TILE_CORNER)
+  const base = ctx.createLinearGradient(0, 0, w * 0.4, h)
+  base.addColorStop(0, `rgb(${TILE_RGB.r + 10},${TILE_RGB.g + 10},${TILE_RGB.b + 10})`)
+  base.addColorStop(1, `rgb(${TILE_RGB.r - 14},${TILE_RGB.g - 16},${TILE_RGB.b - 18})`)
+  ctx.fillStyle = base
+  ctx.fill()
+
+  ctx.save()
+  ctx.clip()
+  for (let i = 0; i < 260; i++) {
+    const x = rng() * w
+    const y = rng() * h
+    const dark = rng() > 0.3
+    ctx.fillStyle = dark ? `rgba(120,90,60,${0.05 + rng() * 0.08})` : `rgba(255,255,255,${0.12 + rng() * 0.18})`
+    ctx.beginPath()
+    ctx.arc(x, y, 0.5 + rng() * 1.1, 0, Math.PI * 2)
+    ctx.fill()
+  }
+  const vignette = ctx.createRadialGradient(w / 2, h / 2, w * 0.35, w / 2, h / 2, w * 0.75)
+  vignette.addColorStop(0, 'rgba(0,0,0,0)')
+  vignette.addColorStop(1, 'rgba(70,45,25,0.16)')
+  ctx.fillStyle = vignette
+  ctx.fillRect(0, 0, w, h)
+  ctx.restore()
+
+  roundedRectPath(ctx, 0.5, 0.5, w - 1, h - 1, TILE_CORNER)
+  ctx.strokeStyle = 'rgba(90,60,35,0.22)'
+  ctx.lineWidth = 1
+  ctx.stroke()
 }
 
 function drawGlaze(
@@ -123,6 +344,7 @@ function drawGlaze(
   recipeIngredients?: IngredientMap,
   firingTempC: number = 1222,
   stability: string = 'High',
+  opacityTarget: string = 'Semi-opaque',
   foodSafe: boolean = false,
 ) {
   if (!/^#[0-9a-fA-F]{6}$/.test(color)) color = '#808080'
@@ -131,10 +353,12 @@ function drawGlaze(
 
   ctx.clearRect(0, 0, w, h)
 
+  const chemistry = deriveChemistry(recipeIngredients, firingTempC, stability, opacityTarget, foodSafe)
+  const melt = chemistry.melt
+  // a fluid dab slumps and runs, so it is set smaller and higher to leave room for the tongues
   const cx = w / 2
-  const cy = h / 2
-  const radius = Math.min(w, h) * 0.44
-  const chemistry = deriveChemistry(recipeIngredients, firingTempC, stability, foodSafe)
+  const radius = Math.min(w, h) * 0.37 * (1 - melt * 0.12)
+  const cy = h / 2 - radius * melt * 0.36
   let { r, g, b } = hexToRgb(color)
   const neutralLift = 245
   r = mix(r, neutralLift, chemistry.opacity * 0.12)
@@ -147,12 +371,27 @@ function drawGlaze(
     b = mix(b, 128, down * 0.25)
   }
   const recipeSeed = recipeIngredients ? JSON.stringify(Object.entries(recipeIngredients).sort()) : 'no-recipe'
-  const rng = seededRng(hashStr(color + surfaceFinish + effect + (secHex ?? '') + recipeSeed))
+  const rng = seededRng(hashStr(color + surfaceFinish + effect + (secHex ?? '') + stability + opacityTarget + recipeSeed))
+  const sag = melt * 0.22
+  const bottomY = cy + radius * (1 + sag)
+  // a fluid glaze runs off the dab as a few tongues that are part of the same outline
+  const lobes = melt > 0.55 ? makeLobes(radius, melt, chemistry.flow, h - 8 - bottomY, rng) : []
+
+  drawTile(ctx, w, h, seededRng(hashStr('tile')))
+
+  // ── drop shadow under the glaze dab ───────────────────────────────
+  ctx.save()
+  ctx.shadowColor = 'rgba(50,30,15,0.35)'
+  ctx.shadowBlur = 18
+  ctx.shadowOffsetY = 6
+  ctx.fillStyle = `rgb(${r},${g},${b})`
+  discPath(ctx, cx, cy, radius, sag, lobes)
+  ctx.fill()
+  ctx.restore()
 
   // ── clip to disc ──────────────────────────────────────────────
   ctx.save()
-  ctx.beginPath()
-  ctx.arc(cx, cy, radius, 0, Math.PI * 2)
+  discPath(ctx, cx, cy, radius, sag, lobes)
   ctx.clip()
 
   // ── base fill ─────────────────────────────────────────────────
@@ -162,7 +401,7 @@ function drawGlaze(
   // More melt generally gives stronger vertical pooling and edge darkening.
   const poolStrength = clamp(chemistry.flow * 0.75, 0, 0.8)
   if (poolStrength > 0.05) {
-    const pool = ctx.createLinearGradient(0, cy - radius, 0, cy + radius)
+    const pool = ctx.createLinearGradient(0, cy - radius, 0, bottomY)
     pool.addColorStop(0, `rgba(255,255,255,${0.05 + poolStrength * 0.1})`)
     pool.addColorStop(0.55, 'rgba(255,255,255,0)')
     pool.addColorStop(1, `rgba(0,0,0,${0.08 + poolStrength * 0.25})`)
@@ -170,103 +409,199 @@ function drawGlaze(
     ctx.fillRect(0, 0, w, h)
   }
 
+  // ── opacity: a property of the glaze, drawn under any colour effect ──
+  if (opacityTarget === 'Opaque') {
+    ctx.fillStyle = `rgba(255,252,246,${0.2 + chemistry.opacity * 0.25})`
+    ctx.fillRect(0, 0, w, h)
+    const cloudNoise = makeNoise(rng, 4)
+    paintLayer(
+      ctx,
+      noiseLayer(96, (x, y) => {
+        const n = cloudNoise(x, y, 3)
+        return n > 0.5 ? [255, 253, 248, (n - 0.5) * 0.45] : [60, 45, 30, (0.5 - n) * 0.12]
+      }),
+      w,
+      h,
+    )
+    // fine orange-peel texture from the opacifier
+    const peelNoise = makeNoise(rng, 24)
+    paintLayer(
+      ctx,
+      noiseLayer(160, (x, y) => {
+        const n = peelNoise(x, y, 2)
+        return n > 0.5 ? [255, 255, 255, (n - 0.5) * 0.16] : [0, 0, 0, (0.5 - n) * 0.1]
+      }),
+      w,
+      h,
+    )
+  } else if (opacityTarget === 'Translucent') {
+    const thicknessNoise = makeNoise(rng, 5)
+    const seeThrough = clamp(0.65 - chemistry.opacity * 0.4, 0.3, 0.7)
+    // thin over the noise peaks and toward the top, so the clay reads through; pooled areas go deeper
+    paintLayer(
+      ctx,
+      noiseLayer(128, (x, y) => {
+        const thin = clamp(thicknessNoise(x, y, 3) * 0.7 + (1 - y) * 0.3, 0, 1)
+        return thin > 0.5
+          ? [TILE_RGB.r, TILE_RGB.g, TILE_RGB.b, (thin - 0.5) * 2 * seeThrough]
+          : [Math.round(r * 0.6), Math.round(g * 0.6), Math.round(b * 0.6), (0.5 - thin) * 0.6 * seeThrough]
+      }),
+      w,
+      h,
+    )
+    const tg = ctx.createLinearGradient(0, cy - radius, 0, bottomY)
+    tg.addColorStop(0, 'rgba(255,255,255,0.18)')
+    tg.addColorStop(1, 'rgba(255,255,255,0)')
+    ctx.fillStyle = tg
+    ctx.fillRect(0, 0, w, h)
+  }
+
   // ── effect layer (underneath the surface-finish sheen) ────────
   switch (effect) {
     case 'Speckled': {
-      const sec2 = secHex ? hexToRgb(secHex) : null
-      const dotCount = Math.round(60 + t * 300 + chemistry.speckle * 220)
-      for (let i = 0; i < dotCount; i++) {
+      const halo: Rgb = secHex ? hexToRgb(secHex) : { r: 150, g: 95, b: 55 }
+      const field = makeNoise(rng, 6)
+      // faint iron bleed under the specks
+      paintLayer(ctx, noiseLayer(96, (x, y) => [120, 80, 50, (field(x, y, 3) - 0.5) * 0.2 * (0.5 + t)]), w, h)
+
+      const dotCount = Math.round(50 + t * 230 + chemistry.speckle * 180)
+      let placed = 0
+      let tries = 0
+      while (placed < dotCount && tries < dotCount * 4) {
+        tries++
         const x = rng() * w
         const y = rng() * h
-        const dotR = 0.5 + t * 2.5
-        const a = (0.2 + rng() * 0.4) * (0.35 + t * 0.65)
+        // clump along the noise field instead of a flat scatter
+        if (rng() > 0.35 + field(x / w, y / h, 2) * 0.9) continue
+        placed++
+        const size = (0.6 + rng() ** 2 * 3) * (0.55 + t * 0.7)
+        const strength = (0.45 + rng() * 0.45) * (0.4 + t * 0.6)
+        const bloom = ctx.createRadialGradient(x, y, 0, x, y, size * 3.2)
+        bloom.addColorStop(0, `rgba(${halo.r},${halo.g},${halo.b},${strength * 0.45})`)
+        bloom.addColorStop(1, `rgba(${halo.r},${halo.g},${halo.b},0)`)
+        ctx.fillStyle = bloom
         ctx.beginPath()
-        ctx.arc(x, y, dotR, 0, Math.PI * 2)
-        if (sec2 && rng() > 0.45) {
-          ctx.fillStyle = `rgba(${sec2.r},${sec2.g},${sec2.b},${a})`
-        } else {
-          const dark = rng() > 0.12
-          ctx.fillStyle = dark
-            ? `rgba(${Math.max(0, r - 70)},${Math.max(0, g - 70)},${Math.max(0, b - 70)},${a})`
-            : `rgba(255,255,255,${a * 0.45})`
-        }
+        ctx.arc(x, y, size * 3.2, 0, Math.PI * 2)
         ctx.fill()
+        ctx.fillStyle = `rgba(32,20,12,${strength})`
+        ctx.beginPath()
+        ctx.ellipse(x, y, size, size * (0.75 + rng() * 0.25), rng() * Math.PI, 0, Math.PI * 2)
+        ctx.fill()
+        if (size > 1.8) {
+          ctx.fillStyle = `rgba(255,255,255,${strength * 0.35})`
+          ctx.beginPath()
+          ctx.arc(x - size * 0.3, y - size * 0.3, size * 0.3, 0, Math.PI * 2)
+          ctx.fill()
+        }
       }
       break
     }
 
     case 'Crystalline': {
-      const count = Math.round(2 + t * 9 + chemistry.crystal * 8)
-      for (let c = 0; c < count; c++) {
-        const kx = cx + (rng() - 0.5) * radius * 1.6
-        const ky = cy + (rng() - 0.5) * radius * 1.6
-        const kr = (8 + rng() * 20) * (0.4 + t * 0.9)   // size scales with intensity
-        const rays = 6 + Math.floor(rng() * 4)
-        const rot = rng() * Math.PI
-        const facetAlpha = 0.06 + t * 0.22
-        for (let i = 0; i < rays; i++) {
-          const a1 = rot + (i / rays) * Math.PI * 2
-          const a2 = rot + ((i + 1) / rays) * Math.PI * 2
-          ctx.beginPath()
-          ctx.moveTo(kx, ky)
-          ctx.lineTo(kx + Math.cos(a1) * kr, ky + Math.sin(a1) * kr)
-          ctx.lineTo(kx + Math.cos(a2) * kr, ky + Math.sin(a2) * kr)
-          ctx.closePath()
-          const sec3 = secHex ? hexToRgb(secHex) : null
-          if (i % 2 === 0 && sec3) {
-            ctx.fillStyle = `rgba(${sec3.r},${sec3.g},${sec3.b},${facetAlpha * 2.2})`
-          } else {
-            ctx.fillStyle = i % 2 === 0
-              ? `rgba(255,255,255,${facetAlpha * 1.4})`
-              : `rgba(0,0,0,${facetAlpha})`
+      const tint: Rgb = secHex ? hexToRgb(secHex) : { r: 250, g: 244, b: 230 }
+      const count = Math.round(2 + t * 7 + chemistry.crystal * 7)
+      const drawRosette = (kx: number, ky: number, kr: number, detail: boolean) => {
+        ctx.save()
+        ctx.translate(kx, ky)
+        ctx.rotate(rng() * Math.PI)
+        ctx.scale(1, 0.8 + rng() * 0.2)
+        // the melt around a crystal is depleted and reads slightly darker
+        const depletion = ctx.createRadialGradient(0, 0, kr * 0.9, 0, 0, kr * 1.35)
+        depletion.addColorStop(0, 'rgba(0,0,0,0.14)')
+        depletion.addColorStop(1, 'rgba(0,0,0,0)')
+        ctx.fillStyle = depletion
+        ctx.beginPath()
+        ctx.arc(0, 0, kr * 1.35, 0, Math.PI * 2)
+        ctx.fill()
+        const body = ctx.createRadialGradient(0, 0, 0, 0, 0, kr)
+        body.addColorStop(0, `rgba(${tint.r},${tint.g},${tint.b},${0.55 + t * 0.3})`)
+        body.addColorStop(0.7, `rgba(${tint.r},${tint.g},${tint.b},${0.3 + t * 0.25})`)
+        body.addColorStop(1, `rgba(${tint.r},${tint.g},${tint.b},0.05)`)
+        ctx.fillStyle = body
+        ctx.beginPath()
+        ctx.arc(0, 0, kr, 0, Math.PI * 2)
+        ctx.fill()
+        if (detail) {
+          const needles = 36 + Math.floor(rng() * 40)
+          ctx.lineCap = 'round'
+          for (let i = 0; i < needles; i++) {
+            const a = (i / needles) * Math.PI * 2 + (rng() - 0.5) * 0.08
+            const len = kr * (0.7 + rng() * 0.35)
+            ctx.strokeStyle =
+              rng() > 0.4
+                ? `rgba(255,255,255,${0.25 + t * 0.3})`
+                : `rgba(${tint.r},${tint.g},${tint.b},${0.2 + t * 0.2})`
+            ctx.lineWidth = 0.5 + rng() * 0.9
+            ctx.beginPath()
+            ctx.moveTo(Math.cos(a) * kr * 0.08, Math.sin(a) * kr * 0.08)
+            ctx.lineTo(Math.cos(a) * len, Math.sin(a) * len)
+            ctx.stroke()
           }
+          ctx.fillStyle = 'rgba(40,30,20,0.35)'
+          ctx.beginPath()
+          ctx.arc(0, 0, kr * 0.08, 0, Math.PI * 2)
           ctx.fill()
         }
-        const cg = ctx.createRadialGradient(kx, ky, 0, kx, ky, kr * 0.7)
-        cg.addColorStop(0, `rgba(255,255,255,${0.15 + t * 0.25})`)
-        cg.addColorStop(1, 'rgba(255,255,255,0)')
-        ctx.fillStyle = cg
+        const cap = ctx.createRadialGradient(-kr * 0.2, -kr * 0.2, 0, -kr * 0.2, -kr * 0.2, kr * 0.5)
+        cap.addColorStop(0, `rgba(255,255,255,${0.3 + t * 0.3})`)
+        cap.addColorStop(1, 'rgba(255,255,255,0)')
+        ctx.fillStyle = cap
         ctx.beginPath()
-        ctx.arc(kx, ky, kr * 0.7, 0, Math.PI * 2)
+        ctx.arc(0, 0, kr, 0, Math.PI * 2)
         ctx.fill()
+        ctx.restore()
+      }
+      for (let c = 0; c < count * 2; c++) {
+        drawRosette(cx + (rng() - 0.5) * radius * 1.7, cy + (rng() - 0.5) * radius * 1.7, 2 + rng() * 4, false)
+      }
+      for (let c = 0; c < count; c++) {
+        drawRosette(
+          cx + (rng() - 0.5) * radius * 1.5,
+          cy + (rng() - 0.5) * radius * 1.5,
+          (9 + rng() * 22) * (0.45 + t * 0.85),
+          true,
+        )
       }
       break
     }
 
     case 'Variegated': {
-      const sec4 = secHex ? hexToRgb(secHex) : null
-      const streakAlpha = 0.03 + t * 0.14 + chemistry.variegation * 0.12
-      const spotCount = Math.round(6 + t * 20 + chemistry.variegation * 20)
-      for (let i = 0; i < 12; i++) {
-        const x0 = rng() * w
-        const x1 = x0 + (rng() - 0.5) * 60
-        const sg = ctx.createLinearGradient(x0, 0, x1, h)
-        if (sec4 && rng() > 0.35) {
-          sg.addColorStop(0, 'rgba(0,0,0,0)')
-          sg.addColorStop(0.3, `rgba(${sec4.r},${sec4.g},${sec4.b},${streakAlpha})`)
-          sg.addColorStop(0.7, `rgba(${sec4.r},${sec4.g},${sec4.b},${streakAlpha * 0.6})`)
-          sg.addColorStop(1, 'rgba(0,0,0,0)')
-        } else {
-          const bright = rng() > 0.45
-          sg.addColorStop(0, 'rgba(255,255,255,0)')
-          sg.addColorStop(0.3, `rgba(${bright ? 255 : 0},${bright ? 255 : 0},${bright ? 255 : 0},${streakAlpha})`)
-          sg.addColorStop(0.7, `rgba(${bright ? 255 : 0},${bright ? 255 : 0},${bright ? 255 : 0},${streakAlpha * 0.6})`)
-          sg.addColorStop(1, 'rgba(255,255,255,0)')
-        }
-        ctx.fillStyle = sg
-        ctx.fillRect(0, 0, w, h)
-      }
-      // rutile / iron spots
+      const flowNoise = makeNoise(rng, 5)
+      const amount = clamp(0.25 + t * 0.5 + chemistry.variegation * 0.35, 0.2, 1)
+      const cream: Rgb = { r: 252, g: 243, b: 222 }
+      const shade: Rgb = secHex
+        ? hexToRgb(secHex)
+        : { r: Math.round(r * 0.55), g: Math.round(g * 0.62), b: Math.min(255, Math.round(b * 0.7 + 45)) }
+      // stretched vertically so the two-phase break-up reads as flow
+      const phase = (x: number, y: number) => flowNoise(x * 1.6, y * 0.7, 4)
+      paintLayer(
+        ctx,
+        noiseLayer(128, (x, y) => {
+          const n = phase(x, y)
+          const light = clamp((n - 0.52) * 4, 0, 1)
+          if (light > 0) return [cream.r, cream.g, cream.b, light * 0.7 * amount]
+          return [shade.r, shade.g, shade.b, clamp((0.46 - n) * 4, 0, 1) * 0.55 * amount]
+        }),
+        w,
+        h,
+      )
+      // seams where the phases meet
+      paintLayer(
+        ctx,
+        noiseLayer(128, (x, y) => [50, 35, 25, clamp(1 - Math.abs(phase(x, y) - 0.49) / 0.025, 0, 1) * 0.28 * amount]),
+        w,
+        h,
+      )
+      // titania crystals glint in the lighter phase
+      const spotCount = Math.round(4 + t * 14 + chemistry.variegation * 14)
       for (let i = 0; i < spotCount; i++) {
         const sx = rng() * w
         const sy = rng() * h
-        const sr = 2 + rng() * 5
+        if (phase(sx / w, sy / h) < 0.5) continue
+        const sr = 2 + rng() * 4
         const sg = ctx.createRadialGradient(sx, sy, 0, sx, sy, sr)
-        const spotR = sec4 ? sec4.r : Math.min(255, r + 60)
-        const spotG = sec4 ? sec4.g : Math.max(0, g - 20)
-        const spotB = sec4 ? sec4.b : 0
-        sg.addColorStop(0, `rgba(${spotR},${spotG},${spotB},${(0.15 + rng() * 0.2) * (0.3 + t * 0.7)})`)
-        sg.addColorStop(1, 'rgba(0,0,0,0)')
+        sg.addColorStop(0, `rgba(255,252,240,${(0.3 + rng() * 0.3) * amount})`)
+        sg.addColorStop(1, 'rgba(255,252,240,0)')
         ctx.fillStyle = sg
         ctx.beginPath()
         ctx.arc(sx, sy, sr, 0, Math.PI * 2)
@@ -275,149 +610,105 @@ function drawGlaze(
       break
     }
 
-    case 'Opaque': {
-      ctx.fillStyle = `rgba(255,255,255,${0.08 + t * 0.24 + chemistry.opacity * 0.28})`
-      ctx.fillRect(0, 0, w, h)
-      const blobCount = Math.round(2 + t * 5)
-      for (let i = 0; i < blobCount; i++) {
-        const ox = cx + (rng() - 0.5) * radius
-        const oy = cy + (rng() - 0.5) * radius
-        const or2 = 18 + rng() * 38
-        const og = ctx.createRadialGradient(ox, oy, 0, ox, oy, or2)
-        og.addColorStop(0, `rgba(255,255,255,${0.06 + t * 0.1})`)
-        og.addColorStop(1, 'rgba(255,255,255,0)')
-        ctx.fillStyle = og
-        ctx.beginPath()
-        ctx.arc(ox, oy, or2, 0, Math.PI * 2)
-        ctx.fill()
-      }
-      break
-    }
-
-    case 'Translucent': {
-      const haze = clamp(0.08 + t * 0.28 + chemistry.opacity * 0.15, 0.06, 0.45)
-      ctx.fillStyle = `rgba(255,255,255,${haze})`
-      ctx.fillRect(0, 0, w, h)
-      const tg = ctx.createLinearGradient(0, 0, w * 0.5, h * 0.5)
-      tg.addColorStop(0, `rgba(255,255,255,${0.06 + t * 0.22})`)
-      tg.addColorStop(1, 'rgba(255,255,255,0)')
-      ctx.fillStyle = tg
-      ctx.fillRect(0, 0, w, h)
-      break
-    }
-
-    case 'Melt': {
-      const melt = secHex ? hexToRgb(secHex) : { r: Math.min(255, r + 80), g: Math.max(0, g - 30), b: Math.max(0, b - 30) }
-      const numDrips = Math.round(1 + t * 6 + chemistry.flow * 5)
-      for (let d = 0; d < numDrips; d++) {
-        const ax = cx + (rng() - 0.5) * radius * 1.2
-        const startY = cy - radius * (0.5 + rng() * 0.45)
-        const dripLen = radius * (0.3 + t * 0.8 + chemistry.flow * 0.55)
-        const endY = Math.min(startY + dripLen, cy + radius * 0.92)
-        const topW = 5 + rng() * 10
-        const tipW = 0.5 + rng() * 2
-        const alpha = (0.3 + rng() * 0.3) * (0.4 + t * 0.6)
-        ctx.beginPath()
-        ctx.moveTo(ax - topW, startY)
-        ctx.bezierCurveTo(
-          ax - topW * 0.6, startY + dripLen * 0.55,
-          ax - tipW,       endY - dripLen * 0.18,
-          ax,              endY,
-        )
-        ctx.bezierCurveTo(
-          ax + tipW,       endY - dripLen * 0.18,
-          ax + topW * 0.6, startY + dripLen * 0.55,
-          ax + topW,       startY,
-        )
-        ctx.closePath()
-        const dg = ctx.createLinearGradient(ax, startY, ax, endY)
-        dg.addColorStop(0,    `rgba(${melt.r},${melt.g},${melt.b},${alpha})`)
-        dg.addColorStop(0.78, `rgba(${melt.r},${melt.g},${melt.b},${alpha * 0.6})`)
-        dg.addColorStop(1,    `rgba(${melt.r},${melt.g},${melt.b},0)`)
-        ctx.fillStyle = dg
-        ctx.fill()
-        const blobR = tipW * 2.2 + rng() * 3
-        const bg2 = ctx.createRadialGradient(ax, endY, 0, ax, endY, blobR)
-        bg2.addColorStop(0, `rgba(${melt.r},${melt.g},${melt.b},${alpha * 0.9})`)
-        bg2.addColorStop(1, `rgba(${melt.r},${melt.g},${melt.b},0)`)
-        ctx.beginPath()
-        ctx.arc(ax, endY, blobR, 0, Math.PI * 2)
-        ctx.fillStyle = bg2
-        ctx.fill()
-      }
-      const poolH = (8 + rng() * 14) * (0.2 + t * 0.8)
-      const pg = ctx.createLinearGradient(0, cy + radius - poolH, 0, cy + radius)
-      pg.addColorStop(0, `rgba(${melt.r},${melt.g},${melt.b},0)`)
-      pg.addColorStop(1, `rgba(${melt.r},${melt.g},${melt.b},${0.2 + t * 0.4})`)
-      ctx.fillStyle = pg
-      ctx.fillRect(0, cy + radius - poolH, w, poolH)
-      break
-    }
-
     case 'Flame': {
-      // Flame color: use secondary, else derive a lighter/shifted tone from base
-      const flameRgb = secHex
+      const flameRgb: Rgb = secHex
         ? hexToRgb(secHex)
-        : { r: Math.min(255, r + 90), g: Math.min(255, g + 60), b: Math.max(0, b - 40) }
-      const flameCount = Math.round(3 + t * 9 + chemistry.flow * 4)
+        : { r: Math.min(255, r + 110), g: Math.min(255, Math.round(g * 0.55 + 60)), b: Math.max(0, Math.round(b * 0.5) - 30) }
+      const ember: Rgb = {
+        r: Math.min(255, flameRgb.r + 30),
+        g: Math.min(255, Math.round(flameRgb.g * 0.85 + 40)),
+        b: Math.max(0, Math.round(flameRgb.b * 0.6)),
+      }
+      const heat = 0.45 + t * 0.55
+      const flameNoise = makeNoise(rng, 6)
+      // flashing climbs from the foot in ragged columns; carbon trap darkens where it did not reach
+      paintLayer(
+        ctx,
+        noiseLayer(144, (x, y) => {
+          const n = flameNoise(x * 2.4, y * 0.5 + 0.3, 4)
+          const rise = clamp((y - 0.1) / 0.7, 0, 1)
+          const lick = clamp((n - 0.38) * 2.6, 0, 1) * rise
+          if (lick > 0.02) return [flameRgb.r, flameRgb.g, flameRgb.b, lick * 0.85 * heat]
+          const soot = clamp((0.5 - n) * 2, 0, 1) * (1 - rise * 0.6)
+          return [20, 14, 12, soot * 0.3 * heat]
+        }),
+        w,
+        h,
+      )
 
+      // tongues of flame: a soft blurred body, then a crisper hot core on top
+      const flameCount = Math.round(4 + t * 6 + chemistry.flow * 3)
+      const tongues: { ax: number; baseY: number; tipX: number; tipY: number; halfW: number; lean: number; alpha: number }[] = []
       for (let f = 0; f < flameCount; f++) {
-        // anchor along bottom third of the disc, spread across width
-        const ax = cx + (rng() - 0.5) * radius * 1.5
-        const baseY = cy + radius * (0.1 + rng() * 0.6)  // root near bottom
-        const flameH = radius * (0.35 + t * 0.85)        // height scales with intensity
-        const tipX  = ax + (rng() - 0.5) * 28            // slight lateral drift at tip
-        const tipY  = baseY - flameH
-        const halfW = 4 + rng() * 9                       // base half-width
-        const ctrlLean = (rng() - 0.5) * 20
-
-        // left edge of flame
-        const lx1 = ax - halfW + ctrlLean
-        const ly1 = baseY - flameH * 0.45
-        // right edge of flame
-        const rx1 = ax + halfW + ctrlLean
-        const ry1 = baseY - flameH * 0.45
-
+        const ax = cx + (rng() - 0.5) * radius * 1.6
+        const baseY = cy + radius * (0.5 + rng() * 0.55)
+        const flameH = radius * (0.6 + rng() * 0.4 + t * 0.9)
+        tongues.push({
+          ax,
+          baseY,
+          tipX: ax + (rng() - 0.5) * 40,
+          tipY: baseY - flameH,
+          halfW: 7 + rng() * 11,
+          lean: (rng() - 0.5) * 30,
+          alpha: (0.35 + rng() * 0.35) * heat,
+        })
+      }
+      const tonguePath = (tg: (typeof tongues)[number], scale: number) => {
+        const flameH = tg.baseY - tg.tipY
+        const hw = tg.halfW * scale
+        const ly = tg.baseY - flameH * 0.45
+        const tipY = tg.tipY + flameH * (1 - scale) * 0.35
         ctx.beginPath()
-        ctx.moveTo(ax - halfW, baseY)
-        ctx.bezierCurveTo(lx1, ly1, tipX - 3, tipY + flameH * 0.15, tipX, tipY)
-        ctx.bezierCurveTo(tipX + 3, tipY + flameH * 0.15, rx1, ry1, ax + halfW, baseY)
+        ctx.moveTo(tg.ax - hw, tg.baseY)
+        ctx.bezierCurveTo(tg.ax - hw + tg.lean, ly, tg.tipX - 2 * scale, tipY + flameH * 0.15, tg.tipX, tipY)
+        ctx.bezierCurveTo(tg.tipX + 2 * scale, tipY + flameH * 0.15, tg.ax + hw + tg.lean, ly, tg.ax + hw, tg.baseY)
         ctx.closePath()
-
-        const alpha = (0.22 + rng() * 0.38) * (0.3 + t * 0.7)
-        const fg = ctx.createLinearGradient(ax, baseY, tipX, tipY)
-        fg.addColorStop(0,    `rgba(${flameRgb.r},${flameRgb.g},${flameRgb.b},${alpha})`)
-        fg.addColorStop(0.55, `rgba(${flameRgb.r},${flameRgb.g},${flameRgb.b},${alpha * 0.7})`)
-        fg.addColorStop(1,    `rgba(${flameRgb.r},${flameRgb.g},${flameRgb.b},0)`)
+      }
+      ctx.save()
+      if ('filter' in ctx) ctx.filter = `blur(${3 + t * 3}px)`
+      for (const tg of tongues) {
+        tonguePath(tg, 1)
+        const fg = ctx.createLinearGradient(tg.ax, tg.baseY, tg.tipX, tg.tipY)
+        fg.addColorStop(0, `rgba(${flameRgb.r},${flameRgb.g},${flameRgb.b},${tg.alpha})`)
+        fg.addColorStop(0.65, `rgba(${flameRgb.r},${flameRgb.g},${flameRgb.b},${tg.alpha * 0.55})`)
+        fg.addColorStop(1, `rgba(${flameRgb.r},${flameRgb.g},${flameRgb.b},0)`)
         ctx.fillStyle = fg
         ctx.fill()
-
-        // inner bright core — white-hot center streak
-        const coreW = halfW * 0.28
-        ctx.beginPath()
-        ctx.moveTo(ax - coreW, baseY)
-        ctx.bezierCurveTo(ax - coreW + ctrlLean * 0.5, ly1, tipX - 1, tipY + flameH * 0.22, tipX, tipY)
-        ctx.bezierCurveTo(tipX + 1, tipY + flameH * 0.22, ax + coreW + ctrlLean * 0.5, ry1, ax + coreW, baseY)
-        ctx.closePath()
-        const cg2 = ctx.createLinearGradient(ax, baseY, tipX, tipY)
-        cg2.addColorStop(0,   `rgba(255,255,255,${alpha * 0.55})`)
-        cg2.addColorStop(0.6, `rgba(255,255,255,${alpha * 0.15})`)
-        cg2.addColorStop(1,   'rgba(255,255,255,0)')
+      }
+      ctx.restore()
+      ctx.save()
+      if ('filter' in ctx) ctx.filter = `blur(${1 + t}px)`
+      for (const tg of tongues) {
+        tonguePath(tg, 0.4)
+        const cg2 = ctx.createLinearGradient(tg.ax, tg.baseY, tg.tipX, tg.tipY)
+        cg2.addColorStop(0, `rgba(${ember.r},${ember.g},${ember.b},${tg.alpha * 0.9})`)
+        cg2.addColorStop(0.5, `rgba(255,232,190,${tg.alpha * 0.45})`)
+        cg2.addColorStop(1, 'rgba(255,232,190,0)')
         ctx.fillStyle = cg2
         ctx.fill()
       }
+      ctx.restore()
 
-      // scattered metallic reduction spots (gold/copper glints)
-      const spotCount = Math.round(5 + t * 20)
+      // carbon trapping settles in the crown
+      const smoke = ctx.createLinearGradient(0, cy - radius, 0, cy + radius * 0.15)
+      smoke.addColorStop(0, `rgba(22,16,14,${0.28 * heat})`)
+      smoke.addColorStop(0.6, `rgba(22,16,14,${0.1 * heat})`)
+      smoke.addColorStop(1, 'rgba(22,16,14,0)')
+      ctx.fillStyle = smoke
+      ctx.fillRect(0, 0, w, h)
+
+      // metallic glints where flux volatilised in the hottest zone
+      const spotCount = Math.round(3 + t * 10)
       for (let i = 0; i < spotCount; i++) {
-        const sx = cx + (rng() - 0.5) * radius * 1.8
-        const sy = cy + (rng() - 0.5) * radius * 1.8
-        const sr = 1.2 + rng() * 3.5
-        const sg2 = ctx.createRadialGradient(sx, sy, 0, sx, sy, sr)
-        // warm gold glint
-        sg2.addColorStop(0, `rgba(210,170,60,${(0.3 + rng() * 0.45) * (0.3 + t * 0.7)})`)
-        sg2.addColorStop(1, 'rgba(210,170,60,0)')
-        ctx.fillStyle = sg2
+        const sx = cx + (rng() - 0.5) * radius * 1.6
+        const sy = cy + radius * (0.1 + rng() * 0.8)
+        const sr = 1 + rng() * 2.2
+        const a = (0.3 + rng() * 0.4) * heat
+        const glint = ctx.createRadialGradient(sx - sr * 0.3, sy - sr * 0.3, 0, sx, sy, sr)
+        glint.addColorStop(0, `rgba(255,240,200,${a})`)
+        glint.addColorStop(0.6, `rgba(${ember.r},${ember.g},${ember.b},${a * 0.5})`)
+        glint.addColorStop(1, `rgba(${ember.r},${ember.g},${ember.b},0)`)
+        ctx.fillStyle = glint
         ctx.beginPath()
         ctx.arc(sx, sy, sr, 0, Math.PI * 2)
         ctx.fill()
@@ -426,10 +717,84 @@ function drawGlaze(
     }
   }
 
+  // ── melt: a property of the glaze, not a colour effect. The same coat thinned
+  // at the crown and piled up at the foot, scaled by how fluid the stability target is.
+  if (melt > 0.15) {
+    const topY = cy - radius
+    const dripGloss = clamp(0.5 + chemistry.gloss * 0.5, 0.3, 1)
+    const move = clamp(melt * 1.2, 0, 1.2)
+    // striations build up non-linearly so a balanced glaze only hints at movement
+    const streak = move * melt
+
+    const thin = ctx.createLinearGradient(0, topY, 0, bottomY)
+    thin.addColorStop(0, `rgba(${TILE_RGB.r},${TILE_RGB.g},${TILE_RGB.b},${clamp(0.32 * move, 0, 0.45)})`)
+    thin.addColorStop(0.38, 'rgba(0,0,0,0)')
+    ctx.fillStyle = thin
+    ctx.fillRect(0, 0, w, h)
+    // multiplying the glaze by itself deepens and saturates where the coat is thick
+    ctx.save()
+    ctx.globalCompositeOperation = 'multiply'
+    const thick = ctx.createLinearGradient(0, topY, 0, bottomY)
+    thick.addColorStop(0.3, `rgba(${r},${g},${b},0)`)
+    thick.addColorStop(1, `rgba(${r},${g},${b},${clamp(0.55 * move, 0, 0.85)})`)
+    ctx.fillStyle = thick
+    ctx.fillRect(0, 0, w, h)
+    ctx.restore()
+
+    const streakNoise = makeNoise(rng, 6)
+    const drift = makeNoise(rng, 3)
+    paintLayer(
+      ctx,
+      noiseLayer(128, (x, y) => {
+        const n = streakNoise(x * 2.8 + (drift(x, y, 2) - 0.5) * 0.6, y * 0.2, 3)
+        const pull = clamp((y - 0.12) / 0.55, 0, 1)
+        return n > 0.5
+          ? [255, 255, 255, (n - 0.5) * 0.9 * pull * streak]
+          : [0, 0, 0, (0.5 - n) * 0.8 * pull * streak]
+      }),
+      w,
+      h,
+    )
+
+    // crawl spots near the crown where the melt pulled too thin to cover
+    if (melt > 0.5) {
+      const spots = Math.round((melt - 0.5) * 12)
+      for (let i = 0; i < spots; i++) {
+        const sx = cx + (rng() - 0.5) * radius * 1.4
+        const sy = topY + radius * (0.08 + rng() * 0.5)
+        const sr = 4 + rng() * 8
+        const cg = ctx.createRadialGradient(sx, sy, 0, sx, sy, sr)
+        cg.addColorStop(0, `rgba(${TILE_RGB.r},${TILE_RGB.g},${TILE_RGB.b},${(0.2 + rng() * 0.2) * move})`)
+        cg.addColorStop(1, `rgba(${TILE_RGB.r},${TILE_RGB.g},${TILE_RGB.b},0)`)
+        ctx.fillStyle = cg
+        ctx.beginPath()
+        ctx.ellipse(sx, sy, sr, sr * 0.6, 0, 0, Math.PI * 2)
+        ctx.fill()
+      }
+    }
+
+    // meniscus at the foot: heavy dark roll with a soft glossy shoulder above it
+    const poolH = radius * (0.1 + 0.3 * move)
+    const pg = ctx.createLinearGradient(0, bottomY - poolH, 0, bottomY)
+    pg.addColorStop(0, 'rgba(0,0,0,0)')
+    pg.addColorStop(0.6, `rgba(0,0,0,${0.18 * move})`)
+    pg.addColorStop(1, `rgba(0,0,0,${0.2 + 0.22 * move})`)
+    ctx.fillStyle = pg
+    ctx.fillRect(0, bottomY - poolH, w, poolH)
+    const lip = ctx.createLinearGradient(0, bottomY - poolH * 1.5, 0, bottomY - poolH * 0.3)
+    lip.addColorStop(0, 'rgba(255,255,255,0)')
+    lip.addColorStop(0.45, `rgba(255,255,255,${dripGloss * 0.22 * move})`)
+    lip.addColorStop(1, 'rgba(255,255,255,0)')
+    ctx.fillStyle = lip
+    ctx.fillRect(0, bottomY - poolH * 1.5, w, poolH * 1.2)
+  }
+
   // ── surface-finish sheen ──────────────────────────────────────
   const finishTarget =
     surfaceFinish === 'Glossy' ? 0.92 : surfaceFinish === 'Satin' ? 0.55 : 0.2
   const effectiveGloss = clamp((finishTarget + chemistry.gloss) / 2, 0, 1)
+
+  if (lobes.length > 0) shadeLobes(ctx, cx, cy, radius, sag, lobes, effectiveGloss)
 
   if (effectiveGloss > 0.72) {
     const bg = ctx.createRadialGradient(cx - radius * 0.22, cy - radius * 0.22, 0, cx, cy, radius)
@@ -466,17 +831,57 @@ function drawGlaze(
 
   ctx.restore()
 
-  // ── inner rim shadow (3-D depth) ──────────────────────────────
+  // ── edge break: glaze thins at the rim and shows the clay through ──
+  // (clipped to the plain outline: the runs are the thickest glass, so they don't break)
+  const breakStrength = clamp(0.35 - chemistry.opacity * 0.3 + chemistry.flow * 0.15, 0.04, 0.4)
+  ctx.save()
+  discPath(ctx, cx, cy, radius, sag)
+  ctx.clip()
+  const edge = ctx.createRadialGradient(cx, cy, radius * 0.86, cx, cy, radius)
+  edge.addColorStop(0, `rgba(${TILE_RGB.r},${TILE_RGB.g},${TILE_RGB.b},0)`)
+  edge.addColorStop(0.75, `rgba(${TILE_RGB.r},${TILE_RGB.g},${TILE_RGB.b},${breakStrength * 0.5})`)
+  edge.addColorStop(1, `rgba(${TILE_RGB.r},${TILE_RGB.g},${TILE_RGB.b},${breakStrength})`)
+  const rim = ctx.createRadialGradient(cx, cy, radius * 0.84, cx, cy, radius)
+  rim.addColorStop(0, 'rgba(0,0,0,0)')
+  rim.addColorStop(1, 'rgba(0,0,0,0.22)')
+  // the lower half is stretched with the sag so the rim gradients hug the real outline
+  const fillRim = (style: CanvasGradient) => {
+    ctx.fillStyle = style
+    ctx.fillRect(0, 0, w, cy)
+    ctx.save()
+    ctx.beginPath()
+    ctx.rect(0, cy, w, h - cy)
+    ctx.clip()
+    ctx.translate(cx, cy)
+    ctx.scale(1, 1 + sag)
+    ctx.translate(-cx, -cy)
+    ctx.fillRect(0, 0, w, h)
+    ctx.restore()
+  }
+  fillRim(edge)
+  fillRim(rim)
+  ctx.restore()
+
+  // ── bevel: lit upper-left lip, shaded lower-right lip ─────────
+  ctx.save()
+  ctx.lineWidth = 2
+  ctx.beginPath()
+  ctx.arc(cx, cy, radius - 1, Math.PI * 0.95, Math.PI * 1.75)
+  ctx.strokeStyle = `rgba(255,255,255,${0.18 + effectiveGloss * 0.3})`
+  ctx.stroke()
+  // the shaded lip follows the real lower outline, runs included
   ctx.save()
   ctx.beginPath()
-  ctx.arc(cx, cy, radius, 0, Math.PI * 2)
-  const rim = ctx.createRadialGradient(cx, cy, radius * 0.82, cx, cy, radius)
-  rim.addColorStop(0, 'rgba(0,0,0,0)')
-  rim.addColorStop(1, 'rgba(0,0,0,0.25)')
-  ctx.fillStyle = rim
-  ctx.fill()
-  ctx.strokeStyle = 'rgba(60,40,20,0.18)'
-  ctx.lineWidth = 1.5
+  ctx.rect(cx - radius * 0.55, cy, w, h - cy)
+  ctx.clip()
+  ctx.translate(0, -1)
+  discPath(ctx, cx, cy, radius, sag, lobes)
+  ctx.strokeStyle = 'rgba(40,25,12,0.22)'
+  ctx.stroke()
+  ctx.restore()
+  discPath(ctx, cx, cy, radius, sag, lobes)
+  ctx.lineWidth = 1
+  ctx.strokeStyle = 'rgba(60,40,20,0.3)'
   ctx.stroke()
   ctx.restore()
 }
@@ -491,7 +896,10 @@ export function GlazePreview({
   selectedRecipeName,
   firingTempC,
   stability,
+  opacity,
   foodSafe,
+  coneLabel,
+  atmosphere,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
@@ -500,10 +908,14 @@ export function GlazePreview({
     if (!canvas) return
     const ctx = canvas.getContext('2d')
     if (!ctx) return
+    const dpr = Math.min(window.devicePixelRatio || 1, 3)
+    canvas.width = Math.round(PREVIEW_SIZE * dpr)
+    canvas.height = Math.round(PREVIEW_SIZE * dpr)
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     drawGlaze(
       ctx,
-      canvas.width,
-      canvas.height,
+      PREVIEW_SIZE,
+      PREVIEW_SIZE,
       color,
       surfaceFinish,
       effect,
@@ -512,24 +924,46 @@ export function GlazePreview({
       recipeIngredients,
       firingTempC,
       stability,
+      opacity,
       foodSafe,
     )
-  }, [color, surfaceFinish, effect, secondaryColor, intensity, recipeIngredients, firingTempC, stability, foodSafe])
+  }, [color, surfaceFinish, effect, secondaryColor, intensity, recipeIngredients, firingTempC, stability, opacity, foodSafe])
+
+  const validColor = /^#[0-9a-fA-F]{6}$/.test(color) ? color : '#808080'
+  const meltLabel = stability === 'Low' ? 'Fluid melt' : stability === 'High' ? 'Stiff melt' : null
+  const chips = [
+    surfaceFinish,
+    coneLabel,
+    atmosphere,
+    opacity && opacity !== 'Semi-opaque' ? opacity : null,
+    meltLabel,
+    effect && effect !== 'None' ? effect : null,
+  ].filter(
+    (chip): chip is string => Boolean(chip),
+  )
 
   return (
     <div className="glaze-preview-wrap">
       <canvas
         ref={canvasRef}
-        width={220}
-        height={220}
+        style={{ width: PREVIEW_SIZE, height: PREVIEW_SIZE }}
         className="glaze-preview-canvas"
         aria-label="Glaze appearance preview"
       />
+      <div className="glaze-preview-meta">
+        <span className="glaze-preview-swatch" style={{ background: validColor }} aria-hidden="true" />
+        <span className="glaze-preview-hex">{validColor.toUpperCase()}</span>
+        {chips.map((chip) => (
+          <span key={chip} className="glaze-preview-chip">
+            {chip}
+          </span>
+        ))}
+      </div>
       <p className="glaze-preview-caption">
-        {recipeIngredients ? 'Preview (calibrated to top recipe)' : 'Preview (input estimate)'}
+        {recipeIngredients ? 'Calibrated to top recipe' : 'Estimate from inputs'}
       </p>
       {selectedRecipeName ? (
-        <p className="glaze-preview-selected">Selected: {selectedRecipeName}</p>
+        <p className="glaze-preview-selected">{selectedRecipeName}</p>
       ) : null}
     </div>
   )

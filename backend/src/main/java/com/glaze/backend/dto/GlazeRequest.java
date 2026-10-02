@@ -27,6 +27,10 @@ public record GlazeRequest(
         @Size(max = 30, message = "Stability must be 30 characters or less")
         String stability,
 
+        /** Optional opacity: Translucent, Semi-opaque, or Opaque. Null is treated as Semi-opaque. */
+        @Size(max = 30, message = "Opacity must be 30 characters or less")
+        String opacity,
+
         @NotNull(message = "Effects list is required")
         List<@Size(max = 30, message = "Each effect must be 30 characters or less") String> effects,
 

@@ -1,6 +1,5 @@
 import './App.css'
 import { GlazeParameterForm } from './components/GlazeParameterForm'
-import { PreviewModal } from './components/PreviewModal'
 import { RecipeResultsPanel } from './components/RecipeResultsPanel'
 import { useGlazeComposer } from './hooks/useGlazeComposer'
 
@@ -22,8 +21,6 @@ function App() {
         <GlazeParameterForm composer={composer} />
         <RecipeResultsPanel composer={composer} />
       </section>
-
-      <PreviewModal composer={composer} />
     </main>
   )
 }

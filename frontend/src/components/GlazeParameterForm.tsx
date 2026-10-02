@@ -1,5 +1,5 @@
 import { GlazePreview } from '../GlazePreview'
-import { ATMOSPHERE_OPTIONS, EFFECTS, SURFACE_FINISHES, SECONDARY_COLOR_LABEL, CONES } from '../app/constants'
+import { ATMOSPHERE_OPTIONS, EFFECTS, SURFACE_FINISHES, STABILITY_STOPS, OPACITY_STOPS, SECONDARY_COLOR_LABEL, CONES } from '../app/constants'
 import { fToC, syncTemperatureInput } from '../app/utils'
 import type { GlazeComposer } from '../hooks/useGlazeComposer'
 
@@ -13,10 +13,6 @@ export function GlazeParameterForm({ composer }: Props) {
     loading,
     error,
     selectedRecipe,
-    hasGeneratedRecipes,
-    openAiButtonRef,
-    openRealisticButtonRef,
-    openPreview,
     handleSubmit,
     currentEffect,
     showSecondaryColor,
@@ -32,7 +28,6 @@ export function GlazeParameterForm({ composer }: Props) {
     tempInputStr,
     setTempInputStr,
     coneIndex,
-    
   } = composer
 
   return (
@@ -49,36 +44,11 @@ export function GlazeParameterForm({ composer }: Props) {
         selectedRecipeName={selectedRecipe?.name}
         firingTempC={form.firingTempC}
         stability={form.stability}
+        opacity={form.opacity}
         foodSafe={form.foodSafe ?? false}
+        coneLabel={CONES[coneIndex].name}
+        atmosphere={form.atmosphere}
       />
-
-      <div className="preview-actions">
-        <p className="deterministic-note">Deterministic render: On</p>
-        <button
-          ref={openAiButtonRef}
-          type="button"
-          className="ghost-btn"
-          disabled={!hasGeneratedRecipes}
-          onMouseEnter={() => undefined}
-          onFocus={() => undefined}
-          onTouchStart={() => undefined}
-          onClick={() => openPreview('ai')}
-        >
-          Open Local Preview Modal
-        </button>
-        <button
-          ref={openRealisticButtonRef}
-          type="button"
-          className="ghost-btn"
-          disabled={!hasGeneratedRecipes}
-          onMouseEnter={() => undefined}
-          onFocus={() => undefined}
-          onTouchStart={() => undefined}
-          onClick={() => openPreview('realistic')}
-        >
-          Open Realistic Tile Render
-        </button>
-      </div>
 
       <label>
         Color goal
@@ -184,12 +154,48 @@ export function GlazeParameterForm({ composer }: Props) {
       </label>
 
       <label>
-        Stability target
-        <select value={form.stability} onChange={(event) => setForm({ ...form, stability: event.target.value })}>
-          <option>High</option>
-          <option>Medium</option>
-          <option>Low</option>
-        </select>
+        Melt / stability
+        <div className="finish-slider-wrap">
+          <input
+            type="range"
+            min={0}
+            max={STABILITY_STOPS.length - 1}
+            value={Math.max(0, STABILITY_STOPS.findIndex((stop) => stop.value === form.stability))}
+            className="finish-slider"
+            onChange={(event) => setForm({ ...form, stability: STABILITY_STOPS[Number(event.target.value)].value })}
+          />
+          <div className="finish-labels">
+            {STABILITY_STOPS.map((stop) => (
+              <span key={stop.value} className={form.stability === stop.value ? 'finish-active' : ''}>
+                {stop.label}
+              </span>
+            ))}
+          </div>
+        </div>
+        <p className="field-note">
+          Stiff glazes stay put on vertical work; fluid glazes move, pool and run, and need a bare foot.
+        </p>
+      </label>
+
+      <label>
+        Opacity
+        <div className="finish-slider-wrap">
+          <input
+            type="range"
+            min={0}
+            max={OPACITY_STOPS.length - 1}
+            value={Math.max(0, OPACITY_STOPS.indexOf(form.opacity as (typeof OPACITY_STOPS)[number]))}
+            className="finish-slider"
+            onChange={(event) => setForm({ ...form, opacity: OPACITY_STOPS[Number(event.target.value)] })}
+          />
+          <div className="finish-labels">
+            {OPACITY_STOPS.map((stop) => (
+              <span key={stop} className={form.opacity === stop ? 'finish-active' : ''}>
+                {stop}
+              </span>
+            ))}
+          </div>
+        </div>
       </label>
 
       <label>
