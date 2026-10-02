@@ -15,14 +15,16 @@ Full-stack web app for generating candidate ceramic glaze recipes from user-sele
 ## Features
 
 - Parameter form for:
-  - Color goal
-  - Firing temperature (C)
-  - Surface finish
-  - Stability target
-  - Optional effects
+  - Color goal (hex) with live canvas preview of the fired glaze
+  - Firing temperature (°C / cone)
+  - Surface finish (Matte / Satin / Glossy)
+  - Melt / stability (Stiff / Balanced / Fluid)
+  - Opacity (Translucent / Semi-opaque / Opaque)
+  - Feldspar source, color character, kiln atmosphere, food-safe mode
+  - Optional colour/texture effect (Speckled, Crystalline, Variegated, Flame) with intensity and secondary colour
 - API endpoint to generate recipe candidates
 - Ingredient percentages normalized to 100%
-- Rationale for each generated recipe
+- Rationale, UMF analysis and firing schedules for each generated recipe
 - Responsive UI for desktop and mobile
 
 ## Backend API
@@ -31,17 +33,23 @@ Endpoint:
 
 - `POST /api/recipes/generate`
 
-Sample request body:
+Sample request body (`opacity`, `intensity`, `secondaryColor`, `feldsparSubstitute`, `colorCharacter`, `atmosphere` and `foodSafe` are optional):
 
 ```json
 {
-  "color": "Sage green",
-  "firingTempC": 1220,
+  "color": "#7f9e87",
+  "firingTempC": 1222,
   "surfaceFinish": "Satin",
-  "stability": "High",
-  "effects": ["Variegated"]
+  "stability": "Low",
+  "opacity": "Opaque",
+  "effects": ["Variegated"],
+  "intensity": 50,
+  "atmosphere": "Oxidation",
+  "foodSafe": true
 }
 ```
+
+`stability` accepts `High` / `Medium` / `Low` (shown in the UI as Stiff / Balanced / Fluid).
 
 Sample response shape:
 
@@ -49,13 +57,16 @@ Sample response shape:
 {
   "recipes": [
     {
-      "name": "Balanced Gloss Base",
-      "firingRange": "High fire (cone 8-10)",
+      "name": "Satin Cone 6-7 — Balanced",
+      "firingRange": "Mid–high fire (cone 6–7)",
       "ingredients": {
-        "Feldspar": 29.76,
-        "Silica": 21.22
+        "Potash Feldspar": 28.4,
+        "Silica": 22.1,
+        "Zircopax": 3.9
       },
-      "rationale": "Designed for Sage green tone at 1220C, satin finish, high stability target."
+      "rationale": "High-fire Potash Feldspar base — silica and kaolin provide the glass network. Balanced flux-silica-alumina ratio for reliable results across a range of kilns. Fluid melt target: Lithium Carbonate and Wollastonite raise flux activity so the glaze moves and pools. Zircopax and Tin Oxide opacify the glaze to a dense, covering surface.",
+      "umf": { "...": "unity molecular formula analysis" },
+      "firingSchedules": [{ "...": "segments for very short / short / standard / slow schedules" }]
     }
   ]
 }
