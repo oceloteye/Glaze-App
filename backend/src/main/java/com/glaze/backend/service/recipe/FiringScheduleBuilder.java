@@ -97,9 +97,10 @@ public final class FiringScheduleBuilder {
         boolean variegated = effects.stream().anyMatch(e -> e.contains("varieg") || e.contains("flame"))
                 || formula.getOrDefault(RUTILE, 0.0) >= 2.5;
         boolean fluid = RecipeVariants.FLUXED.equals(variant)
-                || effects.stream().anyMatch(e -> e.contains("melt"))
+                || RecipeModifier.isFluidStability(request.stability())
                 || formula.getOrDefault(LITHIUM_CARBONATE, 0.0) >= 2.0;
-        boolean stiff = RecipeVariants.HIGH_SILICA.equals(variant);
+        boolean stiff = RecipeVariants.HIGH_SILICA.equals(variant)
+                || (!fluid && RecipeModifier.isStiffStability(request.stability()));
 
         var segments = new ArrayList<FiringSegment>();
         var notes = new ArrayList<String>();

@@ -53,7 +53,7 @@ class UmfCalculatorTest {
     @Test
     void generatedRecipesCarryUmf() {
         var service = new GlazeRecipeService();
-        var request = new GlazeRequest("#3a6bc1", 1222, "Glossy", "Medium", List.of(), 50, null, null, null, "oxidation", true);
+        var request = new GlazeRequest("#3a6bc1", 1222, "Glossy", "Medium", null, List.of(), 50, null, null, null, "oxidation", true);
         for (var recipe : service.generateRecipes(request)) {
             assertThat(recipe.umf()).isNotNull();
             assertThat(recipe.umf().fluxes()).isNotEmpty();

@@ -1,5 +1,3 @@
-import type { RealismControls } from '../types/rendering'
-
 export type TempUnit = 'C' | 'F'
 
 export type GlazeRequest = {
@@ -7,6 +5,7 @@ export type GlazeRequest = {
   firingTempC: number
   surfaceFinish: string
   stability: string
+  opacity: string
   effects: string[]
   intensity?: number
   secondaryColor?: string
@@ -64,13 +63,9 @@ export type GenerateRecipesResponse = {
   recipes: RecipeSuggestion[]
 }
 
-export type PreviewModalMode = 'realistic' | 'ai' | null
-
 export type RecipeExportPayload = {
   exportedAt: string
   parameters: Record<string, unknown>
   scheduleLength: ScheduleLength
   recipes: RecipeSuggestion[]
 }
-
-export type RealismSettings = RealismControls

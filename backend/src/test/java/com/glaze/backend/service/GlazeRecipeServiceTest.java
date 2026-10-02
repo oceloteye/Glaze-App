@@ -18,7 +18,7 @@ class GlazeRecipeServiceTest {
     private static GlazeRequest request(String color, int tempC, String finish,
                                         String stability, List<String> effects,
                                         Integer intensity, String secondaryColor) {
-        return new GlazeRequest(color, tempC, finish, stability, effects, intensity, secondaryColor, null, null, null, null);
+        return new GlazeRequest(color, tempC, finish, stability, null, effects, intensity, secondaryColor, null, null, null, null);
     }
 
     private static GlazeRequest basicRequest(String color, int tempC) {
@@ -218,8 +218,8 @@ class GlazeRecipeServiceTest {
 
         @Test
         void vibrantCharacterIncreasesChromaticColorants() {
-        var natural = new GlazeRequest("#2d7cc4", 1220, "Satin", "Medium", List.of(), 50, null, null, "Natural", null, null);
-        var vibrant = new GlazeRequest("#2d7cc4", 1220, "Satin", "Medium", List.of(), 50, null, null, "Vibrant", null, null);
+        var natural = new GlazeRequest("#2d7cc4", 1220, "Satin", "Medium", null, List.of(), 50, null, null, "Natural", null, null);
+        var vibrant = new GlazeRequest("#2d7cc4", 1220, "Satin", "Medium", null, List.of(), 50, null, null, "Vibrant", null, null);
 
         var naturalBalanced = getBalanced(service.generateRecipes(natural)).ingredients();
         var vibrantBalanced = getBalanced(service.generateRecipes(vibrant)).ingredients();
@@ -232,8 +232,8 @@ class GlazeRecipeServiceTest {
 
         @Test
         void earthyCharacterIncreasesIronAndRutile() {
-        var natural = new GlazeRequest("#6d8a3f", 1220, "Satin", "Medium", List.of(), 50, null, null, "Natural", null, null);
-        var earthy = new GlazeRequest("#6d8a3f", 1220, "Satin", "Medium", List.of(), 50, null, null, "Earthy", null, null);
+        var natural = new GlazeRequest("#6d8a3f", 1220, "Satin", "Medium", null, List.of(), 50, null, null, "Natural", null, null);
+        var earthy = new GlazeRequest("#6d8a3f", 1220, "Satin", "Medium", null, List.of(), 50, null, null, "Earthy", null, null);
 
         var naturalBalanced = getBalanced(service.generateRecipes(natural)).ingredients();
         var earthyBalanced = getBalanced(service.generateRecipes(earthy)).ingredients();
@@ -246,8 +246,8 @@ class GlazeRecipeServiceTest {
 
         @Test
         void cleanCharacterRaisesOpacityAndReducesDarkeners() {
-        var natural = new GlazeRequest("#84bdf2", 1220, "Satin", "Medium", List.of(), 50, null, null, "Natural", null, null);
-        var clean = new GlazeRequest("#84bdf2", 1220, "Satin", "Medium", List.of(), 50, null, null, "Clean", null, null);
+        var natural = new GlazeRequest("#84bdf2", 1220, "Satin", "Medium", null, List.of(), 50, null, null, "Natural", null, null);
+        var clean = new GlazeRequest("#84bdf2", 1220, "Satin", "Medium", null, List.of(), 50, null, null, "Clean", null, null);
 
         var naturalBalanced = getBalanced(service.generateRecipes(natural)).ingredients();
         var cleanBalanced = getBalanced(service.generateRecipes(clean)).ingredients();
@@ -296,20 +296,48 @@ class GlazeRecipeServiceTest {
     }
 
     @Test
-    void meltEffectAddsLithiumCarbonate() {
+    void fluidStabilityAddsLithiumCarbonate() {
         var recipes = service.generateRecipes(
-                request("#ffffff", 1220, "Glossy", "Medium", List.of("Melt"), 100, null));
+                request("#ffffff", 1220, "Glossy", "Low", List.of(), 50, null));
         var balanced = recipes.stream().filter(r -> r.name().contains("Balanced")).findFirst().orElseThrow();
         assertThat(balanced.ingredients()).containsKey("Lithium Carbonate");
+        assertThat(balanced.ingredients()).containsKey("Wollastonite");
     }
 
     @Test
-    void opaqueEffectAddsZircopax() {
-        var recipes = service.generateRecipes(
-                request("#ffffff", 1220, "Satin", "Medium", List.of("Opaque"), 100, null));
-        var balanced = recipes.stream().filter(r -> r.name().contains("Balanced")).findFirst().orElseThrow();
-        assertThat(balanced.ingredients()).containsKey("Zircopax");
-        assertThat(balanced.ingredients()).containsKey("Tin Oxide");
+    void fluidLabelIsAcceptedAsLowStability() {
+        var low = getBalanced(service.generateRecipes(request("#ffffff", 1220, "Glossy", "Low", List.of(), 50, null))).ingredients();
+        var fluid = getBalanced(service.generateRecipes(request("#ffffff", 1220, "Glossy", "Fluid", List.of(), 50, null))).ingredients();
+        assertThat(fluid).isEqualTo(low);
+    }
+
+    // ── Opacity ───────────────────────────────────────────────────────────────────────
+
+    private static GlazeRequest withOpacity(String opacity) {
+        return new GlazeRequest("#3a6bc1", 1220, "Satin", "Medium", opacity, List.of(), 50, null, null, null, null, null);
+    }
+
+    @Test
+    void opaqueOpacityAddsZircopaxAndTin() {
+        var semi = getBalanced(service.generateRecipes(withOpacity("Semi-opaque"))).ingredients();
+        var opaque = getBalanced(service.generateRecipes(withOpacity("Opaque"))).ingredients();
+        assertThat(opaque).containsKey("Tin Oxide");
+        assertThat(opaque.getOrDefault("Zircopax", 0.0)).isGreaterThan(semi.getOrDefault("Zircopax", 0.0));
+    }
+
+    @Test
+    void translucentOpacityRaisesSilica() {
+        var semi = getBalanced(service.generateRecipes(withOpacity("Semi-opaque"))).ingredients();
+        var translucent = getBalanced(service.generateRecipes(withOpacity("Translucent"))).ingredients();
+        assertThat(translucent.getOrDefault("Silica", 0.0)).isGreaterThan(semi.getOrDefault("Silica", 0.0));
+        assertThat(translucent).doesNotContainKey("Tin Oxide");
+    }
+
+    @Test
+    void nullOpacityMatchesSemiOpaque() {
+        var semi = getBalanced(service.generateRecipes(withOpacity("Semi-opaque"))).ingredients();
+        var none = getBalanced(service.generateRecipes(withOpacity(null))).ingredients();
+        assertThat(none).isEqualTo(semi);
     }
 
         @Test
@@ -470,9 +498,9 @@ class GlazeRecipeServiceTest {
 
         @Test
         void foodSafeModeReducesRiskierColorantsAndBoostsSilica() {
-        var normal = new GlazeRequest("#2d7cc4", 1220, "Satin", "Medium", List.of("Flame"),
+        var normal = new GlazeRequest("#2d7cc4", 1220, "Satin", "Medium", null, List.of("Flame"),
             50, null, "Potash Feldspar", "Vibrant", "oxidation", false);
-        var foodSafe = new GlazeRequest("#2d7cc4", 1220, "Satin", "Medium", List.of("Flame"),
+        var foodSafe = new GlazeRequest("#2d7cc4", 1220, "Satin", "Medium", null, List.of("Flame"),
             50, null, "Potash Feldspar", "Vibrant", "oxidation", true);
 
         var normalIngredients = getBalanced(service.generateRecipes(normal)).ingredients();

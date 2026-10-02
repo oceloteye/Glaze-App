@@ -37,157 +37,81 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 0.2rem 0 0.1rem;
+  gap: 0.55rem;
+  padding: 0.9rem 0.9rem 0.8rem;
+  border-radius: 20px;
+  border: 1px solid var(--line-soft);
+  background:
+    radial-gradient(120% 90% at 20% 0%, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0) 60%),
+    linear-gradient(180deg, #fbf5ee, #f1e6d9);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    0 10px 28px rgba(52, 38, 30, 0.1);
 }
 
 .glaze-preview-canvas {
   display: block;
-  border-radius: 50%;
-  box-shadow: 0 4px 22px rgba(52, 38, 30, 0.18);
+  border-radius: 22px;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.6),
+    0 14px 30px rgba(52, 38, 30, 0.22);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
 }
 
-.realistic-preview-canvas {
-  display: block;
-  border-radius: 14px;
-  box-shadow: 0 4px 22px rgba(52, 38, 30, 0.18);
+.glaze-preview-wrap:hover .glaze-preview-canvas {
+  transform: translateY(-2px);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.6),
+    0 18px 36px rgba(52, 38, 30, 0.26);
 }
 
-.realistic-3d-wrap {
-  display: grid;
-  gap: 0.35rem;
-  justify-items: center;
-}
-
-.realistic-3d-wrap canvas {
-  width: min(560px, 88vw);
-  height: min(560px, 62vh);
-  border-radius: 14px;
-  border: 1px solid var(--line-soft);
-  background: #efe4d7;
-}
-
-.ai-preview-wrap {
-  border: 1px solid rgba(50, 103, 79, 0.18);
-  border-radius: 16px;
-  padding: 0.5rem 0.55rem 0.7rem;
-  background: linear-gradient(180deg, rgba(248, 243, 236, 0.96), rgba(255, 255, 255, 0.96));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
-}
-
-.ai-preview-canvas {
-  display: block;
-  border-radius: 14px;
-  box-shadow: 0 4px 22px rgba(52, 38, 30, 0.18);
-}
-
-.ai-preview-image {
-  display: block;
-  width: 220px;
-  height: 220px;
-  object-fit: cover;
-  border-radius: 14px;
-  box-shadow: 0 4px 22px rgba(52, 38, 30, 0.18);
-}
-
-.ai-preview-tags {
+.glaze-preview-meta {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
+  align-items: center;
   gap: 0.35rem;
-  margin-top: 0.35rem;
+  max-width: 100%;
 }
 
-.ai-preview-tag {
-  border: 1px solid rgba(50, 103, 79, 0.18);
+.glaze-preview-swatch {
+  width: 0.9rem;
+  height: 0.9rem;
+  border-radius: 50%;
+  border: 1px solid rgba(60, 40, 20, 0.25);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.5);
+}
+
+.glaze-preview-hex {
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  margin-right: 0.15rem;
+}
+
+.glaze-preview-chip {
+  border: 1px solid rgba(78, 113, 89, 0.22);
   border-radius: 999px;
-  padding: 0.22rem 0.52rem;
+  padding: 0.18rem 0.55rem;
   font-size: 0.72rem;
   color: var(--green-deep);
-  background: rgba(98, 150, 118, 0.08);
-}
-
-.preview-actions {
-  display: grid;
-  gap: 0.45rem;
-}
-
-.deterministic-note {
-  margin: 0;
-  font-size: 0.78rem;
-  color: var(--green-deep);
-  font-weight: 600;
-}
-
-.realism-controls {
-  border: 1px solid var(--line-soft);
-  border-radius: 12px;
-  padding: 0.7rem;
-  background: rgba(255, 255, 255, 0.62);
-}
-
-.realism-controls h3 {
-  margin: 0 0 0.55rem;
-  font-size: 0.92rem;
-}
-
-.ai-modal-note {
-  border: 1px solid rgba(50, 103, 79, 0.14);
-  border-radius: 12px;
-  padding: 0.8rem;
-  background: rgba(98, 150, 118, 0.08);
-}
-
-.realism-grid {
-  display: grid;
-  gap: 0.55rem;
-  grid-template-columns: 1fr;
-}
-
-.modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(33, 24, 18, 0.45);
-  display: grid;
-  place-items: center;
-  padding: 1rem;
-  z-index: 1000;
-}
-
-.modal-panel {
-  width: min(720px, 94vw);
-  max-height: 92vh;
-  overflow: auto;
-  background: #fffaf4;
-  border: 1px solid var(--line-soft);
-  border-radius: 16px;
-  box-shadow: 0 20px 48px rgba(22, 14, 10, 0.28);
-  padding: 1rem;
-  display: grid;
-  gap: 0.8rem;
-}
-
-.modal-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.modal-head h3 {
-  margin: 0;
+  background: rgba(98, 150, 118, 0.1);
+  white-space: nowrap;
 }
 
 .glaze-preview-caption {
-  margin: 0.4rem 0 0;
-  font-size: 0.72rem;
+  margin: 0;
+  font-size: 0.7rem;
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.09em;
 }
 
 .glaze-preview-selected {
-  margin: 0.18rem 0 0;
-  font-size: 0.74rem;
+  margin: -0.3rem 0 0;
+  font-size: 0.8rem;
   color: var(--green-deep);
   font-weight: 600;
   text-align: center;
