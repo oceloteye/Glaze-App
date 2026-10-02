@@ -490,6 +490,83 @@
   gap: 0.2rem;
 }
 
+.ingredient-group + .ingredient-group {
+  margin-top: 0.7rem;
+}
+
+.ingredient-group__head {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.65rem;
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.ingredient-group ul {
+  margin-top: 0.3rem;
+}
+
+.ingredient-name {
+  position: relative;
+  cursor: help;
+  text-decoration: underline dotted #bfae9c;
+  text-underline-offset: 3px;
+}
+
+.ingredient-name:focus-visible {
+  outline: 2px solid var(--green-deep);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+.ingredient-tip {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 8px);
+  z-index: 20;
+  width: min(20rem, 70vw);
+  padding: 0.55rem 0.7rem;
+  border-radius: 10px;
+  background: #2f2620;
+  color: #f7efe6;
+  font-weight: 400;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  box-shadow: 0 8px 20px rgba(40, 28, 18, 0.25);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(4px);
+  transition: opacity 120ms ease, transform 120ms ease, visibility 120ms;
+  pointer-events: none;
+}
+
+.ingredient-tip::after {
+  content: '';
+  position: absolute;
+  left: 1rem;
+  top: 100%;
+  border: 6px solid transparent;
+  border-top-color: #2f2620;
+}
+
+.ingredient-tip__role {
+  display: block;
+  margin-bottom: 0.2rem;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #d9c7b2;
+}
+
+.ingredient-name:hover .ingredient-tip,
+.ingredient-name:focus-visible .ingredient-tip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
 .recipe-card li {
   display: flex;
   justify-content: space-between;
@@ -557,7 +634,8 @@
   outline-offset: -2px;
 }
 
-.firing-schedule summary {
+.firing-schedule summary,
+.umf summary {
   cursor: pointer;
   display: flex;
   flex-wrap: wrap;
@@ -567,23 +645,67 @@
   list-style: none;
 }
 
-.firing-schedule summary::-webkit-details-marker {
+.firing-schedule summary::-webkit-details-marker,
+.umf summary::-webkit-details-marker {
   display: none;
 }
 
-.firing-schedule summary::before {
+.firing-schedule summary::before,
+.umf summary::before {
   content: '▸';
   margin-right: 0.4rem;
   color: var(--green-deep);
 }
 
-.firing-schedule[open] summary::before {
+.firing-schedule[open] summary::before,
+.umf[open] summary::before {
   content: '▾';
 }
 
-.firing-schedule__meta {
+.firing-schedule__meta,
+.umf__meta {
   font-weight: 400;
   font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.umf {
+  margin-top: 0.8rem;
+  border-top: 1px solid var(--line-soft);
+  padding-top: 0.6rem;
+}
+
+.umf__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+  gap: 0.6rem 1rem;
+  margin-top: 0.6rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.umf__column-title {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.umf__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.86rem;
+  border-bottom: 1px dashed #e7ddd3;
+  padding-bottom: 0.15rem;
+  margin-bottom: 0.15rem;
+  cursor: help;
+}
+
+.umf__note {
+  margin: 0.6rem 0 0;
+  font-size: 0.74rem;
   color: var(--text-muted);
 }
 

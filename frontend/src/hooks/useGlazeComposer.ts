@@ -13,7 +13,16 @@ import type {
   ScheduleLength,
   TempUnit,
 } from '../app/types'
-import { cToF, downloadFile, escapeHtml, formatTimestamp, nearestConeIndex } from '../app/utils'
+import {
+  cToF,
+  downloadFile,
+  escapeHtml,
+  formatTimestamp,
+  nearestConeIndex,
+  splitIngredients,
+  sumPercent,
+  type IngredientEntry,
+} from '../app/utils'
 
 const DEFAULT_FORM: GlazeRequest = {
   color: '#7f9e87',
@@ -264,12 +273,37 @@ export function useGlazeComposer() {
 
     const recipeSections = payload.recipes
       .map((recipe) => {
-        const ingredients = Object.entries(recipe.ingredients)
-          .map(
-            ([ingredient, percent]) =>
-              `<tr><td>${escapeHtml(ingredient)}</td><td>${percent.toFixed(2)}%</td></tr>`,
-          )
-          .join('')
+        const { base, colorants } = splitIngredients(recipe.ingredients)
+        const ingredientRows = (title: string, entries: IngredientEntry[]) =>
+          entries.length === 0
+            ? ''
+            : `<tr class="group"><th>${escapeHtml(title)}</th><th>${sumPercent(entries).toFixed(2)}%</th></tr>` +
+              entries
+                .map(
+                  ([ingredient, percent]) =>
+                    `<tr><td>${escapeHtml(ingredient)}</td><td>${percent.toFixed(2)}%</td></tr>`,
+                )
+                .join('')
+        const ingredients = ingredientRows('Base glaze', base) + ingredientRows('Colorants & additives', colorants)
+
+        const umf = recipe.umf
+        const oxideRows = (title: string, oxides: Record<string, number>) => {
+          const rows = Object.entries(oxides)
+          if (rows.length === 0) return ''
+          return `<tr class="group"><th>${escapeHtml(title)}</th><th></th></tr>${rows
+            .map(([oxide, value]) => `<tr><td>${escapeHtml(oxide)}</td><td>${value.toFixed(3)}</td></tr>`)
+            .join('')}`
+        }
+        const umfHtml =
+          umf && Object.keys(umf.fluxes).length > 0
+            ? `
+            <h4>Unity molecular formula — Si:Al ${umf.siAlRatio.toFixed(1)}, R2O:RO ${umf.r2oShare.toFixed(2)}:${(1 - umf.r2oShare).toFixed(2)}</h4>
+            <table>
+              <thead><tr><th>Oxide</th><th>Moles (unity)</th></tr></thead>
+              <tbody>${oxideRows('Fluxes', umf.fluxes)}${oxideRows('Stabilizers', umf.stabilizers)}${oxideRows('Glass formers', umf.glassFormers)}${oxideRows('Colorants', umf.colorants)}</tbody>
+            </table>
+          `
+            : ''
 
         const schedule = scheduleFor(recipe)
         const scheduleRows = schedule
@@ -289,7 +323,7 @@ export function useGlazeComposer() {
           : ''
         const scheduleHtml = schedule
           ? `
-            <h4>Recommended firing schedule (${escapeHtml(schedule.length)}) — cone ${escapeHtml(schedule.cone)}, ${escapeHtml(schedule.atmosphere)}, ${escapeHtml(schedule.coolingStrategy)}</h4>
+            <h4>Recommended firing schedule (${escapeHtml(schedule.length.replace('-', ' '))}) — cone ${escapeHtml(schedule.cone)}, ${escapeHtml(schedule.atmosphere)}, ${escapeHtml(schedule.coolingStrategy)}</h4>
             <p class="notes">~${schedule.estimatedHours} h total: ${schedule.heatingHours} h heating (to end of soak) + ${schedule.coolingHours} h cooling to 150°C</p>
             <table>
               <thead><tr><th>Phase</th><th>Rate</th><th>Target</th><th>Hold</th><th>Note</th></tr></thead>
@@ -308,6 +342,7 @@ export function useGlazeComposer() {
               <thead><tr><th>Ingredient</th><th>Percent</th></tr></thead>
               <tbody>${ingredients}</tbody>
             </table>
+            ${umfHtml}
             ${scheduleHtml}
           </section>
         `
@@ -333,6 +368,7 @@ export function useGlazeComposer() {
           table { width: 100%; border-collapse: collapse; margin-top: 8px; }
           th, td { text-align: left; border: 1px solid #d7c8bb; padding: 6px 8px; font-size: 14px; }
           th { background: #f6eee6; }
+          tr.group th { background: #ece2d6; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: #5f4b3f; }
           .recipe { border-top: 2px solid #e1d4c7; margin-top: 18px; padding-top: 14px; break-inside: avoid; }
           .range { color: #5f4b3f; font-style: italic; }
         </style>

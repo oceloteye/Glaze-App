@@ -1,4 +1,24 @@
+import { COLORANT_INGREDIENTS } from './constants'
 import type { TempUnit } from './types'
+
+export type IngredientEntry = [name: string, percent: number]
+
+export function splitIngredients(ingredients: Record<string, number>): {
+  base: IngredientEntry[]
+  colorants: IngredientEntry[]
+} {
+  const base: IngredientEntry[] = []
+  const colorants: IngredientEntry[] = []
+  for (const entry of Object.entries(ingredients)) {
+    const target = COLORANT_INGREDIENTS.has(entry[0]) ? colorants : base
+    target.push(entry)
+  }
+  return { base, colorants }
+}
+
+export function sumPercent(entries: IngredientEntry[]): number {
+  return entries.reduce((total, [, percent]) => total + percent, 0)
+}
 
 export function cToF(c: number): number {
   return Math.round((c * 9) / 5 + 32)

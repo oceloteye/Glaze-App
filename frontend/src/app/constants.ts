@@ -61,3 +61,146 @@ export const THICKNESS_OPTIONS = ['Thin', 'Medium', 'Thick'] as const
 export const ATMOSPHERE_OPTIONS = ['Oxidation', 'Reduction'] as const
 export const COOLING_OPTIONS = ['Fast', 'Normal', 'Slow'] as const
 export const LIGHTING_OPTIONS = ['Studio Neutral', 'Daylight', 'Warm Indoor'] as const
+
+/** Ingredient names the backend adds for colour, opacity or surface effects (everything else is the base glaze). */
+export const COLORANT_INGREDIENTS = new Set<string>([
+  'Red Iron Oxide',
+  'Yellow Iron Oxide',
+  'Iron Oxide',
+  'Cobalt Carbonate',
+  'Copper Carbonate',
+  'Manganese Dioxide',
+  'Manganese Granules',
+  'Rutile',
+  'Titanium Dioxide',
+  'Ilmenite (granular)',
+  'Iron Chromate',
+  'Zircopax',
+  'Tin Oxide',
+])
+
+export type IngredientInfo = { role: string; description: string }
+
+/** Short hover text for UMF oxides. */
+export const OXIDE_INFO: Record<string, string> = {
+  K2O: 'Potassium — alkali flux; stiff, bright glass, keeps colours vivid.',
+  Na2O: 'Sodium — alkali flux; fluid, glossy, high expansion; turquoise with copper.',
+  Li2O: 'Lithium — strong alkali flux; low expansion, boosts gloss and colour.',
+  CaO: 'Calcium — main stoneware flux; hardness, durability, matte in excess.',
+  MgO: 'Magnesium — flux above cone 5; buttery satin/matte, softens colours.',
+  ZnO: 'Zinc — mid/high-fire flux; brightens colours, grows crystals when high.',
+  Al2O3: 'Alumina — stabilizer; stiffens the melt, adds durability, prevents running.',
+  B2O3: 'Boron — low-temperature glass former/flux; early melt, gloss, some clouding.',
+  SiO2: 'Silica — the glass former; hardness, acid resistance, raises melt temperature.',
+  TiO2: 'Titania — opacifier and crystal seed; variegation and satin surfaces.',
+  ZrO2: 'Zirconia — opacifier; whitens and stiffens without changing melt much.',
+  SnO2: 'Tin — soft white opacifier.',
+  Fe2O3: 'Iron — ambers/browns in oxidation, celadon/tenmoku in reduction; a flux.',
+  CuO: 'Copper — green, turquoise or reduction red; increases fluidity.',
+  CoO: 'Cobalt — intense blue at tiny amounts.',
+  MnO: 'Manganese — browns and purples; metallic when high.',
+  Cr2O3: 'Chrome — greens, greys; pinks with tin.',
+}
+
+export const INGREDIENT_INFO: Record<string, IngredientInfo> = {
+  'Potash Feldspar': {
+    role: 'Primary flux / glass former',
+    description: 'Brings potassium, alumina and silica in one mineral. Melts at stoneware temperatures, gives a stiff, durable glass and helps colours stay bright.',
+  },
+  'Soda Feldspar': {
+    role: 'Primary flux / glass former',
+    description: 'Like potash feldspar but sodium-based: a slightly more fluid, glossier melt with higher thermal expansion. Warms copper toward turquoise.',
+  },
+  'Nepheline Syenite': {
+    role: 'Strong alkaline flux',
+    description: 'A low-silica feldspathic rock with more sodium and potassium than feldspar. Melts earlier, brightens alkaline colours, and lowers the maturing temperature.',
+  },
+  'Ferro Frit 3134': {
+    role: 'Low-temperature flux',
+    description: 'Pre-melted calcium-boron-sodium glass. Melts early and evenly, adds gloss and clarity, and carries low- and mid-fire glazes without raw soluble materials.',
+  },
+  'EPK Kaolin': {
+    role: 'Alumina source / suspension',
+    description: 'Pure clay that supplies alumina for stiffness and durability, keeps the raw glaze suspended in the bucket, and helps it adhere to the pot before firing.',
+  },
+  Whiting: {
+    role: 'Calcium flux',
+    description: 'Calcium carbonate. Inactive at low fire but a powerful flux above cone 4; increases hardness and durability and promotes matte surfaces when in excess.',
+  },
+  Dolomite: {
+    role: 'Calcium + magnesium flux',
+    description: 'Supplies both calcium and magnesium. Magnesium gives a buttery, satin-to-matte surface and softens colours toward pastel tones.',
+  },
+  Wollastonite: {
+    role: 'Calcium flux / silica source',
+    description: 'Calcium silicate. Adds calcium without releasing carbon dioxide, so it reduces pinholes and crawling while contributing silica to the glass.',
+  },
+  Silica: {
+    role: 'Glass former',
+    description: 'The backbone of the glass. More silica gives a harder, more durable, more acid-resistant surface and raises the melting point.',
+  },
+  Bentonite: {
+    role: 'Suspension agent',
+    description: 'Highly plastic clay used in small amounts to keep the glaze from settling and to toughen the dry glaze coat.',
+  },
+  'Zinc Oxide': {
+    role: 'Flux / crystal former',
+    description: 'An active mid- and high-fire flux that brightens colours and increases gloss. At high levels it grows zinc-silicate crystals during a slow cool.',
+  },
+  'Lithium Carbonate': {
+    role: 'Powerful alkaline flux',
+    description: 'A strong low-expansion flux that lowers the melting point, increases fluidity and gloss, and brightens copper blues and other alkaline colours.',
+  },
+  Zircopax: {
+    role: 'Opacifier',
+    description: 'Zirconium silicate. Whitens and opacifies the glaze without affecting the melt much; also stiffens the glaze and makes colours more pastel.',
+  },
+  'Tin Oxide': {
+    role: 'Opacifier',
+    description: 'A soft, creamy white opacifier. Softer than Zircopax in appearance and reacts with chrome to produce pinks.',
+  },
+  Rutile: {
+    role: 'Variegation / colour modifier',
+    description: 'Impure titanium dioxide with iron. Creates streaks, mottling and crystalline variegation; gives tans, creams and blues depending on the base and cooling.',
+  },
+  'Titanium Dioxide': {
+    role: 'Opacifier / crystal seeding',
+    description: 'Pure titania. Encourages micro-crystals for satin or matte surfaces and colour variegation, and adds a soft opacity.',
+  },
+  'Copper Carbonate': {
+    role: 'Colorant',
+    description: 'Greens in oxidation, turquoise in alkaline bases, and reds in reduction. Also a flux; higher amounts make the glaze more fluid and can go metallic.',
+  },
+  'Cobalt Carbonate': {
+    role: 'Colorant',
+    description: 'The strongest blue colorant; a fraction of a percent gives a clear blue. Shifts toward purple with manganese and softens with magnesium.',
+  },
+  'Manganese Dioxide': {
+    role: 'Colorant',
+    description: 'Browns and purples, especially with cobalt in alkaline bases. Can produce metallic surfaces in high amounts. Also acts as a flux.',
+  },
+  'Manganese Granules': {
+    role: 'Speckle agent',
+    description: 'Coarse manganese that melts into dark specks in the glaze surface rather than dissolving evenly.',
+  },
+  'Ilmenite (granular)': {
+    role: 'Speckle agent',
+    description: 'Coarse iron-titanium ore that produces dark, slightly metallic specks scattered through the glaze.',
+  },
+  'Iron Chromate': {
+    role: 'Colorant',
+    description: 'Iron and chrome together. Gives greys, browns and black; with tin it can shift toward pink-brown.',
+  },
+  'Red Iron Oxide': {
+    role: 'Colorant',
+    description: 'The most common iron colorant. Amber and honey in oxidation, celadon greens and tenmoku blacks in reduction; also fluxes the glaze.',
+  },
+  'Yellow Iron Oxide': {
+    role: 'Colorant',
+    description: 'Fine iron hydroxide that disperses evenly for smooth tans and yellows; slightly weaker than red iron by weight.',
+  },
+  'Iron Oxide': {
+    role: 'Colorant',
+    description: 'Iron in general. Warm browns and ambers in oxidation, greens and blacks in reduction; increases fluidity of the melt.',
+  },
+}
