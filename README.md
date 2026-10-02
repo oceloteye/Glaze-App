@@ -111,6 +111,35 @@ Set-Location .\frontend
 npm.cmd run build
 ```
 
+## Deploy
+
+### Single container (recommended for Render free tier)
+
+The root `Dockerfile` builds the React app and bundles it into the Spring Boot jar, so one container serves both the UI at `/` and the API at `/api/*`. Same origin means no CORS or cross-service networking is needed.
+
+Build and run locally with Docker:
+
+```powershell
+docker build -t glaze-app .
+docker run --rm -p 8080:8080 glaze-app
+```
+
+Open `http://localhost:8080`. The app honours a `PORT` environment variable (defaults to 8080) and exposes `GET /api/health` for liveness checks.
+
+### Render
+
+`render.yaml` defines a free-plan Docker web service.
+
+1. Push the repository to GitHub.
+2. In Render, choose **New → Blueprint**, connect the repo, and accept the detected `render.yaml`.
+3. Render builds the image and serves the app at `https://<service-name>.onrender.com`. Pushes to `main` redeploy automatically.
+
+Free-tier caveats: the service spins down after ~15 minutes without traffic and takes up to a minute to wake on the next request (Render shows a loading page meanwhile); the filesystem is ephemeral (nothing is persisted by this app anyway); and the instance has 512 MB RAM — the default `JAVA_OPTS` in `render.yaml` keep the JVM comfortably inside that limit.
+
+### Separate containers
+
+`backend/Dockerfile` and `frontend/Dockerfile` (nginx proxying `/api/` to `BACKEND_HOST:8080`) remain for hosts where two services can talk over a private network. Set `CORS_ALLOWED_ORIGINS` on the backend if the frontend is served from a different origin without a proxy.
+
 ## Notes
 
 - Generated recipes are exploratory and should be validated with test tiles and kiln-specific adjustments before production use.
