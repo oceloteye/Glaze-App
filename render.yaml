@@ -1,4 +1,5 @@
 # Render Blueprint — https://render.com/docs/blueprint-spec
+# Alternative to the Cloud Run GitHub Actions deploy; uses the same root Dockerfile.
 # One free Docker web service: Spring Boot serves both the API and the built React app.
 services:
   - type: web
