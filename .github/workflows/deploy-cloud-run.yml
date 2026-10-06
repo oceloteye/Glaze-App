@@ -1,8 +1,8 @@
-name: Deploy to Cloud Run
+name: Deploy to Cloud Run (manual fallback)
 
+# Primary deploys come from the Cloud Run → GitHub repo connection (Cloud Build trigger).
+# This workflow is manual-only to avoid double-deploying the same service.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 env:
