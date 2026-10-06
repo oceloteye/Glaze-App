@@ -9,7 +9,6 @@ function App() {
   return (
     <main className="page-shell">
       <section className="intro-card">
-        <p className="badge">Studio Lab</p>
         <h1>Ceramic Glaze Composer</h1>
         <p className="subtitle">
           Blend color, firing range, finish, and effects to draft candidate glaze recipes.
@@ -21,6 +20,13 @@ function App() {
         <GlazeParameterForm composer={composer} />
         <RecipeResultsPanel composer={composer} />
       </section>
+
+      <footer className="page-footer">
+        Enjoying the Glaze Composer?{' '}
+        <a href="https://ko-fi.com/ecoce" target="_blank" rel="noopener noreferrer">
+          Support it on Ko-fi
+        </a>
+      </footer>
     </main>
   )
 }
