@@ -133,18 +133,6 @@
   animation: rise-in 500ms ease-out;
 }
 
-.badge {
-  margin: 0;
-  display: inline-block;
-  padding: 0.35rem 0.7rem;
-  border-radius: 999px;
-  font-size: 0.75rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  background-color: rgba(98, 150, 118, 0.2);
-  color: var(--green-deep);
-}
-
 .subtitle {
   max-width: 56ch;
 }
@@ -154,6 +142,26 @@
   grid-template-columns: 360px 1fr;
   gap: 1rem;
   margin-top: 1rem;
+}
+
+.page-footer {
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line-soft);
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.page-footer a {
+  color: var(--green-deep);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.page-footer a:hover,
+.page-footer a:focus-visible {
+  text-decoration: underline;
 }
 
 .panel {
