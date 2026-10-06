@@ -1,6 +1,6 @@
-# Glaze App
+# Glaze Lab
 
-Full-stack web app for generating candidate ceramic glaze recipes from user-selected parameters.
+Full-stack web app of ceramic glaze tools. The first tool, the **Recipe Generator**, drafts candidate glaze recipes from user-selected parameters.
 
 ## Tech Stack
 
@@ -26,6 +26,7 @@ Full-stack web app for generating candidate ceramic glaze recipes from user-sele
 - Ingredient percentages normalized to 100%
 - Rationale, UMF analysis and firing schedules for each generated recipe
 - Responsive UI for desktop and mobile
+- Pages: Home (`/`) and Recipe Generator (`/generator`), with client-side routing; the backend forwards unknown non-API paths to `index.html` so deep links work
 
 ## Backend API
 
