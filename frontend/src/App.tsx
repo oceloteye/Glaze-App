@@ -9,7 +9,7 @@ function App() {
   return (
     <main className="page-shell">
       <section className="intro-card">
-        <h1>Ceramic Glaze Composer</h1>
+        <h1>Glaze Lab</h1>
         <p className="subtitle">
           Blend color, firing range, finish, and effects to draft candidate glaze recipes.
           Percentages are generated for exploration and should be test-fired before production use.

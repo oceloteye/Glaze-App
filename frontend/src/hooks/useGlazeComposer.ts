@@ -245,7 +245,7 @@ export function useGlazeComposer() {
         </style>
       </head>
       <body>
-        <h1>Ceramic Glaze Composer - Recipe Report</h1>
+        <h1>Glaze Lab - Recipe Report</h1>
         <p class="meta">Generated ${escapeHtml(payload.exportedAt)}</p>
         <h2>Glaze Parameters</h2>
         <table>
