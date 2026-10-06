@@ -4,6 +4,7 @@ import { NavLink } from 'react-router'
 const NAV_ITEMS = [
   { to: '/', label: 'Home', end: true },
   { to: '/generator', label: 'Recipe Generator' },
+  { to: '/builder', label: 'Recipe Builder' },
 ]
 
 export function SiteHeader() {
