@@ -126,9 +126,21 @@ docker run --rm -p 8080:8080 glaze-app
 
 Open `http://localhost:8080`. The app honours a `PORT` environment variable (defaults to 8080) and exposes `GET /api/health` for liveness checks.
 
-### Google Cloud Run via GitHub Actions (primary)
+### Google Cloud Run — connected GitHub repo (primary)
 
-`.github/workflows/deploy-cloud-run.yml` runs backend tests and frontend checks on every push to `main`, then builds the image, pushes it to Artifact Registry and deploys it to Cloud Run (512 MiB, 1 vCPU, scale-to-zero, max 2 instances). Authentication uses Workload Identity Federation, so no service-account keys are stored in GitHub.
+Cloud Run builds and deploys the root `Dockerfile` on every push to `main` via a Cloud Build trigger. No GitHub secrets or workflow configuration are needed.
+
+1. In the Cloud Run console choose **Create service → Continuously deploy from a repository**, then **Set up with Cloud Build**.
+2. Authenticate GitHub, install the Cloud Build GitHub app on this repo and select it.
+3. Branch `^main$`, build type **Dockerfile**, source location `/Dockerfile`.
+4. Service settings: allow unauthenticated invocations; container port `8080`; memory `512 MiB`; 1 vCPU with **CPU boost** enabled; min instances `0`, max instances `2`; environment variable `JAVA_OPTS` = `-XX:MaxRAMPercentage=65 -XX:+UseSerialGC -Xss512k -XX:TieredStopAtLevel=1`.
+5. Create. The first build takes several minutes (Maven and npm dependencies are downloaded in Cloud Build); subsequent pushes redeploy automatically.
+
+Cloud Run's always-free tier covers low tester traffic; keep min instances at `0` (a warm instance is billable) and set a billing budget alert. Cold starts take a few seconds.
+
+### Google Cloud Run — GitHub Actions (manual fallback)
+
+`.github/workflows/deploy-cloud-run.yml` is `workflow_dispatch`-only so it never races the repo connection above. When run it executes backend tests and frontend checks, builds the image, pushes it to Artifact Registry and deploys it to Cloud Run with the same settings. Authentication uses Workload Identity Federation, so no service-account keys are stored in GitHub.
 
 One-time setup (replace `PROJECT_ID`, `GITHUB_OWNER/REPO`; region defaults to `us-central1`):
 
@@ -168,7 +180,7 @@ Then in the GitHub repo (**Settings → Secrets and variables → Actions**):
 | Secret | `GCP_SERVICE_ACCOUNT` | `github-deployer@PROJECT_ID.iam.gserviceaccount.com` |
 | Secret | `GCP_WORKLOAD_IDENTITY_PROVIDER` | `projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/github/providers/github` |
 
-Push to `main` (or run the workflow manually) and the service URL appears in the job summary. Cloud Run's always-free tier covers low tester traffic; keep `--min-instances=0` (a warm instance is billable) and set a billing budget alert. Cold starts take a few seconds.
+Run the workflow from the **Actions** tab; the service URL appears in the job summary.
 
 ### Render (alternative)
 
