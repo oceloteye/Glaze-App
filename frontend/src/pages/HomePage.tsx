@@ -6,13 +6,16 @@ export function HomePage() {
       <section className="intro-card">
         <h1>Glaze Lab</h1>
         <p className="subtitle">
-          Tools for designing ceramic glazes. Describe the colour, cone, finish, melt and opacity
-          you're after and get candidate recipes with chemistry you can inspect — then prove them
-          on test tiles.
+          Tools for designing ceramic glazes. Describe the glaze you're after and get candidate
+          recipes, or build one material by material and watch the chemistry, predicted surface
+          and safety notes respond — then prove it on test tiles.
         </p>
         <div className="hero__actions">
           <Link to="/generator" className="button button--primary">
             Open the Recipe Generator
+          </Link>
+          <Link to="/builder" className="button button--secondary">
+            Open the Recipe Builder
           </Link>
         </div>
       </section>

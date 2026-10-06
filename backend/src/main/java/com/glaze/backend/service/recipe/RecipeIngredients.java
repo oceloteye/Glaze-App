@@ -30,6 +30,21 @@ final class RecipeIngredients {
     static final String YELLOW_IRON_OXIDE = "Yellow Iron Oxide";
     static final String LITHIUM_CARBONATE = "Lithium Carbonate";
 
+    // Builder-only materials (not used by the generator's base recipes).
+    static final String CUSTER_FELDSPAR = "Custer Feldspar";
+    static final String FERRO_FRIT_3124 = "Ferro Frit 3124";
+    static final String TALC = "Talc";
+    static final String GERSTLEY_BORATE = "Gerstley Borate";
+    static final String BALL_CLAY = "Ball Clay";
+    static final String SPODUMENE = "Spodumene";
+    static final String BONE_ASH = "Bone Ash";
+    static final String STRONTIUM_CARBONATE = "Strontium Carbonate";
+    static final String BARIUM_CARBONATE = "Barium Carbonate";
+    static final String COBALT_OXIDE = "Cobalt Oxide";
+    static final String COPPER_OXIDE = "Copper Oxide";
+    static final String CHROME_OXIDE = "Chrome Oxide";
+    static final String NICKEL_OXIDE = "Nickel Oxide";
+
     static final Set<String> COLORANT_KEYS = Set.of(
             RED_IRON_OXIDE, YELLOW_IRON_OXIDE, IRON_OXIDE, COBALT_CARBONATE,
             COPPER_CARBONATE, MANGANESE_DIOXIDE, RUTILE, ZIRCOPAX,

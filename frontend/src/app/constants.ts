@@ -94,17 +94,21 @@ export const OXIDE_INFO: Record<string, string> = {
   CaO: 'Calcium — main stoneware flux; hardness, durability, matte in excess.',
   MgO: 'Magnesium — flux above cone 5; buttery satin/matte, softens colours.',
   ZnO: 'Zinc — mid/high-fire flux; brightens colours, grows crystals when high.',
+  BaO: 'Barium — flux; silky mattes and vivid blues/greens, but toxic and leachable.',
+  SrO: 'Strontium — flux; the non-toxic stand-in for barium, satin surfaces.',
   Al2O3: 'Alumina — stabilizer; stiffens the melt, adds durability, prevents running.',
   B2O3: 'Boron — low-temperature glass former/flux; early melt, gloss, some clouding.',
   SiO2: 'Silica — the glass former; hardness, acid resistance, raises melt temperature.',
   TiO2: 'Titania — opacifier and crystal seed; variegation and satin surfaces.',
   ZrO2: 'Zirconia — opacifier; whitens and stiffens without changing melt much.',
   SnO2: 'Tin — soft white opacifier.',
+  P2O5: 'Phosphorus — from bone ash; opalescent blue-white chun effects.',
   Fe2O3: 'Iron — ambers/browns in oxidation, celadon/tenmoku in reduction; a flux.',
   CuO: 'Copper — green, turquoise or reduction red; increases fluidity.',
   CoO: 'Cobalt — intense blue at tiny amounts.',
   MnO: 'Manganese — browns and purples; metallic when high.',
   Cr2O3: 'Chrome — greens, greys; pinks with tin.',
+  NiO: 'Nickel — greys, greens and browns; pinks/blues with zinc or barium.',
 }
 
 export const INGREDIENT_INFO: Record<string, IngredientInfo> = {

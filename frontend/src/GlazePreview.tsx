@@ -14,6 +14,8 @@ interface Props {
   foodSafe?: boolean
   coneLabel?: string
   atmosphere?: string
+  /** Overrides the default "Calibrated to top recipe" / "Estimate from inputs" caption. */
+  caption?: string
 }
 
 const PREVIEW_SIZE = 240
@@ -900,6 +902,7 @@ export function GlazePreview({
   foodSafe,
   coneLabel,
   atmosphere,
+  caption,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
@@ -960,7 +963,7 @@ export function GlazePreview({
         ))}
       </div>
       <p className="glaze-preview-caption">
-        {recipeIngredients ? 'Calibrated to top recipe' : 'Estimate from inputs'}
+        {caption ?? (recipeIngredients ? 'Calibrated to top recipe' : 'Estimate from inputs')}
       </p>
       {selectedRecipeName ? (
         <p className="glaze-preview-selected">{selectedRecipeName}</p>
