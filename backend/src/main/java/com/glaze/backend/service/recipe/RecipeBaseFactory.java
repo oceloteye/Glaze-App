@@ -14,6 +14,11 @@ import static com.glaze.backend.service.recipe.RecipeIngredients.ZINC_OXIDE;
 
 public final class RecipeBaseFactory {
 
+    /** Lithium carbonate added by the Fluxed variant; also the ceiling Low stability may top up to. */
+    static final double FLUXED_LITHIUM_CARBONATE = 3.0;
+    static final int CONE_6_LOWER_BOUND = 1200;
+    static final int CONE_6_UPPER_BOUND = 1260;
+
     private RecipeBaseFactory() {
     }
 
@@ -36,8 +41,13 @@ public final class RecipeBaseFactory {
             RecipeMath.adjust(formula, FERRO_FRIT_3134, 6.0);
             RecipeMath.adjustIfPresent(formula, SILICA, -3.0);
             RecipeMath.adjustIfPresent(formula, WHITING, -3.0);
+        } else if (tempC < CONE_6_UPPER_BOUND && tempC >= CONE_6_LOWER_BOUND) {
+            RecipeMath.adjust(formula, FERRO_FRIT_3134, 4.0);
+            RecipeMath.adjust(formula, RecipeIngredients.LITHIUM_CARBONATE, 1.0);
+            RecipeMath.adjustIfPresent(formula, WHITING, -2.0);
+            RecipeMath.adjustIfPresent(formula, POTASH_FELDSPAR, -1.5);
         } else {
-            RecipeMath.adjust(formula, RecipeIngredients.LITHIUM_CARBONATE, 3.5);
+            RecipeMath.adjust(formula, RecipeIngredients.LITHIUM_CARBONATE, FLUXED_LITHIUM_CARBONATE);
             RecipeMath.adjustIfPresent(formula, POTASH_FELDSPAR, -2.0);
             RecipeMath.adjustIfPresent(formula, SILICA, -1.5);
         }
@@ -77,6 +87,19 @@ public final class RecipeBaseFactory {
         return formula;
     }
 
+    /** Cone 6: feldspar base carried by Frit 3134 boron. Target UMF ~ SiO2 3.1, Al2O3 0.36, B2O3 0.15, CaO 0.67, MgO 0.11, KNaO 0.22. */
+    private static Map<String, Double> cone6Base() {
+        var formula = new LinkedHashMap<String, Double>();
+        formula.put(POTASH_FELDSPAR, 28.0);
+        formula.put(SILICA, 22.0);
+        formula.put(EPK_KAOLIN, 16.0);
+        formula.put(FERRO_FRIT_3134, 14.0);
+        formula.put(WHITING, 12.0);
+        formula.put(DOLOMITE, 6.0);
+        formula.put(BENTONITE, 2.0);
+        return formula;
+    }
+
     private static Map<String, Double> highFireBase() {
         var formula = new LinkedHashMap<String, Double>();
         formula.put(POTASH_FELDSPAR, 37.0);
@@ -91,7 +114,8 @@ public final class RecipeBaseFactory {
     private static Map<String, Double> baseForTemp(int tempC) {
         if (tempC < 1000) return lowFireBase();
         if (tempC < 1120) return lowMidFireBase();
-        if (tempC < 1200) return midFireBase();
+        if (tempC < CONE_6_LOWER_BOUND) return midFireBase();
+        if (tempC < CONE_6_UPPER_BOUND) return cone6Base();
         return highFireBase();
     }
 }
