@@ -138,13 +138,14 @@ class GeneratedRecipeLimitsTest {
     }
 
     private void printFindings() {
+        int sample = Integer.getInteger("audit.sample", 4);
         var out = new StringBuilder("\n=== Generated recipe audit: ").append(recipesAudited).append(" recipes ===\n");
         findings.entrySet().stream()
                 .sorted((a, b) -> Integer.compare(b.getValue().size(), a.getValue().size()))
                 .forEach(e -> {
                     out.append(String.format("%n[%3d] %s%n", e.getValue().size(), e.getKey()));
-                    e.getValue().stream().limit(4).forEach(x -> out.append("      ").append(x).append('\n'));
-                    if (e.getValue().size() > 4) out.append("      ... and ").append(e.getValue().size() - 4).append(" more\n");
+                    e.getValue().stream().limit(sample).forEach(x -> out.append("      ").append(x).append('\n'));
+                    if (e.getValue().size() > sample) out.append("      ... and ").append(e.getValue().size() - sample).append(" more\n");
                 });
         System.out.println(out);
     }

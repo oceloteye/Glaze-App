@@ -9,6 +9,7 @@ import static com.glaze.backend.service.recipe.RecipeIngredients.COBALT_CARBONAT
 import static com.glaze.backend.service.recipe.RecipeIngredients.COPPER_CARBONATE;
 import static com.glaze.backend.service.recipe.RecipeIngredients.DOLOMITE;
 import static com.glaze.backend.service.recipe.RecipeIngredients.EPK_KAOLIN;
+import static com.glaze.backend.service.recipe.RecipeIngredients.FERRO_FRIT_3124;
 import static com.glaze.backend.service.recipe.RecipeIngredients.FERRO_FRIT_3134;
 import static com.glaze.backend.service.recipe.RecipeIngredients.ILMENITE_GRANULAR;
 import static com.glaze.backend.service.recipe.RecipeIngredients.IRON_CHROMATE;
@@ -20,8 +21,10 @@ import static com.glaze.backend.service.recipe.RecipeIngredients.POTASH_FELDSPAR
 import static com.glaze.backend.service.recipe.RecipeIngredients.RED_IRON_OXIDE;
 import static com.glaze.backend.service.recipe.RecipeIngredients.RUTILE;
 import static com.glaze.backend.service.recipe.RecipeIngredients.SILICA;
+import static com.glaze.backend.service.recipe.RecipeIngredients.TALC;
 import static com.glaze.backend.service.recipe.RecipeIngredients.TIN_OXIDE;
 import static com.glaze.backend.service.recipe.RecipeIngredients.TITANIUM_DIOXIDE;
+import static com.glaze.backend.service.recipe.RecipeIngredients.WHITING;
 import static com.glaze.backend.service.recipe.RecipeIngredients.WOLLASTONITE;
 import static com.glaze.backend.service.recipe.RecipeIngredients.YELLOW_IRON_OXIDE;
 import static com.glaze.backend.service.recipe.RecipeIngredients.ZINC_OXIDE;
@@ -47,22 +50,70 @@ public final class RecipeModifier {
 
     public static void applySurfaceAdjustments(Map<String, Double> formula, String finish, int tempC) {
         String normalized = finish.toLowerCase(Locale.ROOT);
+        FiringBand band = FiringBand.of(tempC);
         if (normalized.contains("gloss")) {
-            RecipeMath.adjust(formula, SILICA, 3.0);
+            RecipeMath.adjust(formula, SILICA, band.isLowFire() ? 1.5 : 3.0);
             RecipeMath.adjustIfPresent(formula, POTASH_FELDSPAR, 2.0);
-            RecipeMath.adjustIfPresent(formula, FERRO_FRIT_3134, 2.0);
-            RecipeMath.adjustIfPresent(formula, DOLOMITE, -2.0);
+            if (!band.isLowFire()) {
+                RecipeMath.adjustIfPresent(formula, FERRO_FRIT_3134, 2.0);
+            }
+            RecipeMath.adjustIfPresent(formula, DOLOMITE, band == FiringBand.MID ? -4.0 : -2.0);
             RecipeMath.adjustIfPresent(formula, EPK_KAOLIN, -3.0);
-        } else if (normalized.contains("matte")) {
-            RecipeMath.adjustIfPresent(formula, DOLOMITE, 4.0);
-            RecipeMath.adjust(formula, EPK_KAOLIN, 2.5);
-            RecipeMath.adjust(formula, SILICA, -3.0);
-            RecipeMath.adjustIfPresent(formula, POTASH_FELDSPAR, -2.0);
-            RecipeMath.adjust(formula, WOLLASTONITE, 2.0);
         } else {
-            RecipeMath.adjustIfPresent(formula, DOLOMITE, 2.0);
-            RecipeMath.adjust(formula, EPK_KAOLIN, 1.0);
-            RecipeMath.adjust(formula, SILICA, -2.0);
+            applyMatteAdjustments(formula, band, normalized.contains("matte") ? 1.0 : satinDose(band));
+        }
+    }
+
+    /**
+     * Satin is a partial matte dose. The pure-frit low-fire base starts far up the gloss curve so it needs most of
+     * the matte swap; the zinc/dolomite mid-fire base is already close to satin so it needs very little.
+     */
+    private static double satinDose(FiringBand band) {
+        return switch (band) {
+            case LOW -> 0.85;
+            case LOW_MID -> 0.55;
+            case MID -> 0.3;
+            case CONE_6, HIGH -> 0.6;
+        };
+    }
+
+    /**
+     * Mattes come from raising Al2O3 and MgO relative to SiO2, not from starving the melt.
+     * Each band pushes toward the classic matte chemistry for that temperature; satin uses a partial dose.
+     */
+    private static void applyMatteAdjustments(Map<String, Double> formula, FiringBand band, double scale) {
+        switch (band) {
+            case LOW, LOW_MID -> {
+                // Swap boron-heavy frit for alumina-bearing frit, kaolin and talc: a magnesia matte.
+                RecipeMath.adjustIfPresent(formula, FERRO_FRIT_3134, -22.0 * scale);
+                RecipeMath.adjust(formula, FERRO_FRIT_3124, 12.0 * scale);
+                RecipeMath.adjust(formula, EPK_KAOLIN, 8.0 * scale);
+                RecipeMath.adjust(formula, TALC, 14.0 * scale);
+                RecipeMath.adjust(formula, WHITING, 3.0 * scale);
+                RecipeMath.adjust(formula, SILICA, -12.0 * scale);
+                RecipeMath.adjustIfPresent(formula, POTASH_FELDSPAR, -2.0 * scale);
+            }
+            case MID -> {
+                RecipeMath.adjust(formula, DOLOMITE, 6.0 * scale);
+                RecipeMath.adjust(formula, EPK_KAOLIN, 6.0 * scale);
+                RecipeMath.adjustIfPresent(formula, POTASH_FELDSPAR, -4.0 * scale);
+                RecipeMath.adjustIfPresent(formula, WHITING, -2.0 * scale);
+            }
+            case CONE_6 -> {
+                RecipeMath.adjust(formula, DOLOMITE, 6.0 * scale);
+                RecipeMath.adjust(formula, EPK_KAOLIN, 6.0 * scale);
+                RecipeMath.adjust(formula, SILICA, -7.0 * scale);
+                RecipeMath.adjustIfPresent(formula, FERRO_FRIT_3134, -4.0 * scale);
+                RecipeMath.adjustIfPresent(formula, WHITING, -2.0 * scale);
+                RecipeMath.adjustIfPresent(formula, POTASH_FELDSPAR, 2.0 * scale);
+            }
+            case HIGH -> {
+                RecipeMath.adjust(formula, DOLOMITE, 6.0 * scale);
+                RecipeMath.adjust(formula, EPK_KAOLIN, 6.0 * scale);
+                RecipeMath.adjust(formula, SILICA, -4.0 * scale);
+                RecipeMath.adjustIfPresent(formula, WHITING, -3.0 * scale);
+                RecipeMath.adjustIfPresent(formula, POTASH_FELDSPAR, 3.0 * scale);
+            }
         }
     }
 
@@ -97,8 +148,8 @@ public final class RecipeModifier {
     public static void applyOpacityAdjustments(Map<String, Double> formula, String opacity) {
         String normalized = opacity == null ? "" : opacity.toLowerCase(Locale.ROOT);
         if (normalized.contains("transluc") || normalized.contains("transparent")) {
-            RecipeMath.adjust(formula, SILICA, 2.5);
-            RecipeMath.adjustIfPresent(formula, EPK_KAOLIN, -1.5);
+            // A little extra silica for clarity; alumina is left alone so a translucent matte stays matte.
+            RecipeMath.adjust(formula, SILICA, 1.5);
         } else if (normalized.isEmpty() || normalized.contains("semi")) {
             RecipeMath.adjust(formula, ZIRCOPAX, 5.0);
         } else if (normalized.contains("opaque")) {
