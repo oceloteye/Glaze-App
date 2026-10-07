@@ -2,6 +2,7 @@ import './App.css'
 import { BrowserRouter, Outlet, Route, Routes } from 'react-router'
 import { SiteHeader } from './components/SiteHeader'
 import { HomePage } from './pages/HomePage'
+import { RecipeBuilderPage } from './pages/RecipeBuilderPage'
 import { RecipeGeneratorPage } from './pages/RecipeGeneratorPage'
 
 function Layout() {
@@ -28,6 +29,7 @@ function App() {
         <Route element={<Layout />}>
           <Route index element={<HomePage />} />
           <Route path="generator" element={<RecipeGeneratorPage />} />
+          <Route path="builder" element={<RecipeBuilderPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

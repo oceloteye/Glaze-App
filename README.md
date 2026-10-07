@@ -1,6 +1,6 @@
 # Glaze Lab
 
-Full-stack web app of ceramic glaze tools. The first tool, the **Recipe Generator**, drafts candidate glaze recipes from user-selected parameters.
+Full-stack web app of ceramic glaze tools. The **Recipe Generator** drafts candidate glaze recipes from user-selected parameters, and the **Recipe Builder** lets you assemble a recipe from raw materials with sliders and see the predicted result, chemistry and safety notes update live.
 
 ## Tech Stack
 
@@ -25,14 +25,19 @@ Full-stack web app of ceramic glaze tools. The first tool, the **Recipe Generato
 - API endpoint to generate recipe candidates
 - Ingredient percentages normalized to 100%
 - Rationale, UMF analysis and firing schedules for each generated recipe
+- Recipe Builder: pick from 38 catalogued materials, set amounts in parts with sliders or number inputs (auto-normalised to 100%), choose cone and atmosphere, and get a live predicted tile, property meters (melt, gloss, opacity, durability, thermal expansion), the unity molecular formula and grouped notes covering melt/maturity, glaze fit, application defects, food safety and handling/toxicity
 - Responsive UI for desktop and mobile
-- Pages: Home (`/`) and Recipe Generator (`/generator`), with client-side routing; the backend forwards unknown non-API paths to `index.html` so deep links work
+- Pages: Home (`/`), Recipe Generator (`/generator`) and Recipe Builder (`/builder`), with client-side routing; the backend forwards unknown non-API paths to `index.html` so deep links work
 
 ## Backend API
 
-Endpoint:
+Endpoints:
 
-- `POST /api/recipes/generate`
+- `POST /api/recipes/generate` — draft recipes from target parameters
+- `GET /api/materials` — the material catalogue used by the Recipe Builder
+- `POST /api/recipes/analyze` — analyse a user-built recipe
+
+### `POST /api/recipes/generate`
 
 Sample request body (`opacity`, `intensity`, `secondaryColor`, `feldsparSubstitute`, `colorCharacter`, `atmosphere` and `foodSafe` are optional):
 
@@ -72,6 +77,46 @@ Sample response shape:
   ]
 }
 ```
+
+### `GET /api/materials`
+
+Returns the material catalogue as a list of `{ name, category, role, description, analysis, hazard, foodSafety, maxParts }` objects, where `analysis` is the oxide weight-fraction analysis used for UMF calculations.
+
+### `POST /api/recipes/analyze`
+
+Sample request body (`parts` are relative amounts and are normalised to 100%; `atmosphere` is optional, `oxidation` or `reduction`):
+
+```json
+{
+  "parts": { "Potash Feldspar": 40, "Whiting": 20, "EPK Kaolin": 15, "Silica": 25 },
+  "firingTempC": 1222,
+  "atmosphere": "oxidation"
+}
+```
+
+Sample response shape:
+
+```json
+{
+  "normalizedRecipe": { "Potash Feldspar": 40.0, "Whiting": 20.0, "EPK Kaolin": 15.0, "Silica": 25.0 },
+  "totalParts": 100.0,
+  "cone": "Cone 6",
+  "umf": { "...": "unity molecular formula analysis" },
+  "properties": {
+    "melt": 0.62, "meltLabel": "Balanced",
+    "gloss": 0.75, "surface": "Glossy",
+    "opacity": 0.11, "opacityLabel": "Translucent",
+    "durability": 0.94, "durabilityLabel": "Hard & durable",
+    "expansion": 63.7, "expansionLabel": "Moderate (fits most stoneware)"
+  },
+  "warnings": [
+    { "severity": "info", "category": "fit", "title": "Expansion looks workable", "message": "..." },
+    { "severity": "info", "category": "toxicity", "title": "Dust precautions", "message": "..." }
+  ]
+}
+```
+
+`severity` is `info` / `caution` / `danger`; `category` is `maturity`, `fit`, `application`, `food-safety` or `toxicity`.
 
 ## Run Locally
 
