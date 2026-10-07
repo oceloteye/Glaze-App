@@ -86,7 +86,9 @@ public final class RecipeModifier {
             RecipeMath.adjust(formula, SILICA, 1.5);
             RecipeMath.adjust(formula, EPK_KAOLIN, -1.5);
             RecipeMath.adjust(formula, BENTONITE, -0.5);
-            RecipeMath.adjust(formula, LITHIUM_CARBONATE, 1.5);
+            // Top up lithium only to the Fluxed-variant ceiling so Low + Fluxed does not stack Li2O past ~0.15.
+            double lithiumRoom = RecipeBaseFactory.FLUXED_LITHIUM_CARBONATE - formula.getOrDefault(LITHIUM_CARBONATE, 0.0);
+            RecipeMath.adjust(formula, LITHIUM_CARBONATE, Math.max(0.0, Math.min(1.5, lithiumRoom)));
             RecipeMath.adjust(formula, WOLLASTONITE, 1.0);
             RecipeMath.adjustIfPresent(formula, POTASH_FELDSPAR, -1.0);
         }
@@ -97,10 +99,10 @@ public final class RecipeModifier {
         if (normalized.contains("transluc") || normalized.contains("transparent")) {
             RecipeMath.adjust(formula, SILICA, 2.5);
             RecipeMath.adjustIfPresent(formula, EPK_KAOLIN, -1.5);
-        } else if (normalized.contains("semi")) {
-            return;
+        } else if (normalized.isEmpty() || normalized.contains("semi")) {
+            RecipeMath.adjust(formula, ZIRCOPAX, 5.0);
         } else if (normalized.contains("opaque")) {
-            RecipeMath.adjust(formula, ZIRCOPAX, 4.0);
+            RecipeMath.adjust(formula, ZIRCOPAX, 10.0);
             RecipeMath.adjust(formula, TIN_OXIDE, 1.5);
         }
     }

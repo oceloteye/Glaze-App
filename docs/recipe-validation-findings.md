@@ -1,7 +1,7 @@
 # Recipe generation — validation findings
 
-Branch: `feature/recipe-validation`. Nothing in the generator has been changed; this
-document reports what the new tests found so tuning can be decided deliberately.
+Branch: `feature/recipe-validation`. The first section records what the new tests
+found before any tuning; "Round 1 tuning" at the end records what has since changed.
 
 ## Method
 
@@ -127,14 +127,47 @@ These are smaller, and most would resolve with items 4–5.
   no Underfired melts, no danger warnings.
 - Low-expansion labels on opaque variants (~57 ×10⁻⁷) are expected and fine.
 
-## Suggested next steps (not applied)
+## Suggested next steps
 
-1. Add a 1200–1250 °C boron-bearing base (fixes #1).
-2. Raise opacifier levels (fixes #3).
-3. Cap combined Li₂O at ~0.10 (fixes #4, most of #6).
+1. ~~Add a 1200–1250 °C boron-bearing base (fixes #1).~~ Done — see Round 1.
+2. ~~Raise opacifier levels (fixes #3).~~ Done — see Round 1.
+3. ~~Cap combined Li₂O at ~0.10 (fixes #4, most of #6).~~ Done — see Round 1.
 4. Rework the matte modifier per temperature band (fixes #2 finish, #5).
 5. Split 1000 vs. 1100 bases and trim low-fire silica/alumina (fixes #2 limits).
 
 After any tuning, re-run `GeneratedRecipeLimitsTest` and compare the printed report;
 the hard invariants protect against regressions and the reference tests guard the
 calculator and analyzer.
+
+## Round 1 tuning — applied
+
+Steps 1–3 above were implemented; steps 4–5 remain open.
+
+| Change | Where |
+|---|---|
+| New `cone6Base()` for 1200–1259 °C: Potash Feldspar 28, Silica 22, EPK 16, Frit 3134 14, Whiting 12, Dolomite 6, Bentonite 2 (≈ SiO₂ 3.1, Al₂O₃ 0.36, B₂O₃ 0.15, CaO 0.67, MgO 0.11, KNaO 0.22). Cone 6 Fluxed variant adds +4 frit, +1 Li carb, −2 whiting, −1.5 feldspar instead of the lithium-only high-fire recipe. | `RecipeBaseFactory` |
+| Fluxed lithium carbonate 3.5 → 3.0; Low stability now tops lithium up *to* that ceiling instead of stacking +1.5 on top. | `RecipeBaseFactory`, `RecipeModifier.applyStabilityAdjustments` |
+| Opaque: Zircopax 4 → 10 (+1.5 tin). Semi-opaque (and null opacity): 0 → 5 Zircopax. | `RecipeModifier.applyOpacityAdjustments` |
+| Rationale text for the cone 6 flux system and the semi-opaque addition. | `RecipeNarrativeBuilder` |
+| `normalize()` now pushes the rounding residue onto the largest ingredient instead of whichever key happened to be last — the old behaviour produced phantom 0.01 % entries for zeroed trace materials. | `RecipeMath` |
+
+### Audit before → after (405 recipes)
+
+| Finding | Before | After |
+|---|---|---|
+| Requested Opaque → Semi-opaque | 125 | 0 |
+| Requested Semi-opaque → Translucent | 135 | 10 (all 1186 Matte/Low–Medium, opacity 0.36–0.39) |
+| Melt Stiff (1222 Glossy/High) | 6 | 0 |
+| SiO₂ > 3.8 at 1222 | 16 | 4 (High-Silica variants, 3.82–3.96) |
+| Al₂O₃ > 0.45 at 1222 | 2 | 0 |
+| Li₂O > 0.15 (1186/1222/1285) | 36 | 0 |
+| Expansion "High (crazing risk)" | 18 | 0 |
+| Melt Runny | 3 | 0 |
+| Durability Soft | 39 | 22 (Matte/Low/Fluxed combinations) |
+| Requested Glossy → Satin | 8 | 20 (1186 Glossy/High now carries 5 % zircon, which the analyzer reads as stiffer) |
+
+Unchanged, pending steps 4–5: low-fire Matte/Satin → Glossy (77 / 85), low-fire
+SiO₂/Al₂O₃/CaO excursions (66 / 24 / 36+36), 1186 Matte → Satin (46), and the
+1285 matte limits (SiO₂ < 3.0 ×26, KNaO < 0.2 ×24, Al₂O₃ < 0.3 ×17).
+
+All 117 backend tests pass (98 existing + 19 validation).
