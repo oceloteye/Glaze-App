@@ -69,3 +69,48 @@ export type RecipeExportPayload = {
   scheduleLength: ScheduleLength
   recipes: RecipeSuggestion[]
 }
+
+// ── Recipe Builder ──────────────────────────────────────────────────────────
+
+export type MaterialInfo = {
+  name: string
+  category: string
+  role: string
+  description: string
+  analysis: Record<string, number>
+  hazard: string | null
+  foodSafety: string | null
+  maxParts: number
+}
+
+export type WarningSeverity = 'info' | 'caution' | 'danger'
+export type WarningCategory = 'toxicity' | 'food-safety' | 'fit' | 'maturity' | 'application'
+
+export type GlazeWarning = {
+  severity: WarningSeverity
+  category: WarningCategory
+  title: string
+  message: string
+}
+
+export type GlazeProperties = {
+  melt: number
+  meltLabel: string
+  gloss: number
+  surface: string
+  opacity: number
+  opacityLabel: string
+  durability: number
+  durabilityLabel: string
+  expansion: number
+  expansionLabel: string
+}
+
+export type AnalyzeResponse = {
+  normalizedRecipe: Record<string, number>
+  totalParts: number
+  cone: string
+  umf: Umf
+  properties: GlazeProperties
+  warnings: GlazeWarning[]
+}
