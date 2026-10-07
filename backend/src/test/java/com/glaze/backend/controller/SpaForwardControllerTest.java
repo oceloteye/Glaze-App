@@ -43,4 +43,10 @@ class SpaForwardControllerTest {
         mockMvc.perform(get("/missing-asset.js"))
                 .andExpect(status().isNotFound());
     }
+
+    @Test
+    void bundledAssetsAreNotForwarded() throws Exception {
+        mockMvc.perform(get("/assets/index-abc123.js"))
+                .andExpect(status().isNotFound());
+    }
 }
