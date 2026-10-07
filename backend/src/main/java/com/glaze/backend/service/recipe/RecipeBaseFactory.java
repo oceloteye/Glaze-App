@@ -6,7 +6,9 @@ import java.util.Map;
 import static com.glaze.backend.service.recipe.RecipeIngredients.BENTONITE;
 import static com.glaze.backend.service.recipe.RecipeIngredients.DOLOMITE;
 import static com.glaze.backend.service.recipe.RecipeIngredients.EPK_KAOLIN;
+import static com.glaze.backend.service.recipe.RecipeIngredients.FERRO_FRIT_3124;
 import static com.glaze.backend.service.recipe.RecipeIngredients.FERRO_FRIT_3134;
+import static com.glaze.backend.service.recipe.RecipeIngredients.LITHIUM_CARBONATE;
 import static com.glaze.backend.service.recipe.RecipeIngredients.POTASH_FELDSPAR;
 import static com.glaze.backend.service.recipe.RecipeIngredients.SILICA;
 import static com.glaze.backend.service.recipe.RecipeIngredients.WHITING;
@@ -16,8 +18,6 @@ public final class RecipeBaseFactory {
 
     /** Lithium carbonate added by the Fluxed variant; also the ceiling Low stability may top up to. */
     static final double FLUXED_LITHIUM_CARBONATE = 3.0;
-    static final int CONE_6_LOWER_BOUND = 1200;
-    static final int CONE_6_UPPER_BOUND = 1260;
 
     private RecipeBaseFactory() {
     }
@@ -28,8 +28,9 @@ public final class RecipeBaseFactory {
 
     public static Map<String, Double> highSilicaBase(int tempC) {
         var formula = new LinkedHashMap<>(baseForTemp(tempC));
-        RecipeMath.adjust(formula, SILICA, 5.0);
-        RecipeMath.adjustIfPresent(formula, EPK_KAOLIN, -3.0);
+        // Extra silica for durability; keep most of the kaolin so the Si:Al ratio (and a matte request) survives.
+        RecipeMath.adjust(formula, SILICA, 4.0);
+        RecipeMath.adjustIfPresent(formula, EPK_KAOLIN, -1.0);
         RecipeMath.adjustIfPresent(formula, POTASH_FELDSPAR, -2.0);
         RecipeMath.adjustIfPresent(formula, FERRO_FRIT_3134, -2.0);
         return formula;
@@ -37,40 +38,46 @@ public final class RecipeBaseFactory {
 
     public static Map<String, Double> fluxedBase(int tempC) {
         var formula = new LinkedHashMap<>(baseForTemp(tempC));
-        if (tempC < 1120) {
-            RecipeMath.adjust(formula, FERRO_FRIT_3134, 6.0);
-            RecipeMath.adjustIfPresent(formula, SILICA, -3.0);
-            RecipeMath.adjustIfPresent(formula, WHITING, -3.0);
-        } else if (tempC < CONE_6_UPPER_BOUND && tempC >= CONE_6_LOWER_BOUND) {
-            RecipeMath.adjust(formula, FERRO_FRIT_3134, 4.0);
-            RecipeMath.adjust(formula, RecipeIngredients.LITHIUM_CARBONATE, 1.0);
-            RecipeMath.adjustIfPresent(formula, WHITING, -2.0);
-            RecipeMath.adjustIfPresent(formula, POTASH_FELDSPAR, -1.5);
-        } else {
-            RecipeMath.adjust(formula, RecipeIngredients.LITHIUM_CARBONATE, FLUXED_LITHIUM_CARBONATE);
-            RecipeMath.adjustIfPresent(formula, POTASH_FELDSPAR, -2.0);
-            RecipeMath.adjustIfPresent(formula, SILICA, -1.5);
+        switch (FiringBand.of(tempC)) {
+            case LOW, LOW_MID -> {
+                RecipeMath.adjust(formula, FERRO_FRIT_3134, 6.0);
+                RecipeMath.adjustIfPresent(formula, SILICA, -3.0);
+                RecipeMath.adjustIfPresent(formula, WHITING, -3.0);
+            }
+            case CONE_6 -> {
+                RecipeMath.adjust(formula, FERRO_FRIT_3134, 4.0);
+                RecipeMath.adjust(formula, LITHIUM_CARBONATE, 1.0);
+                RecipeMath.adjustIfPresent(formula, WHITING, -2.0);
+                RecipeMath.adjustIfPresent(formula, POTASH_FELDSPAR, -1.5);
+            }
+            default -> {
+                RecipeMath.adjust(formula, LITHIUM_CARBONATE, FLUXED_LITHIUM_CARBONATE);
+                RecipeMath.adjustIfPresent(formula, POTASH_FELDSPAR, -3.0);
+            }
         }
         return formula;
     }
 
+    /** Cone 06–04: two frits, no feldspar. Target UMF ~ SiO2 2.8, Al2O3 0.28, B2O3 0.6, CaO 0.68, KNaO 0.32. */
     private static Map<String, Double> lowFireBase() {
         var formula = new LinkedHashMap<String, Double>();
-        formula.put(FERRO_FRIT_3134, 55.0);
+        formula.put(FERRO_FRIT_3134, 52.0);
+        formula.put(FERRO_FRIT_3124, 14.0);
         formula.put(EPK_KAOLIN, 20.0);
-        formula.put(SILICA, 17.0);
-        formula.put(WHITING, 6.0);
+        formula.put(SILICA, 12.0);
         formula.put(BENTONITE, 2.0);
         return formula;
     }
 
+    /** Cone 03–02: frit with feldspar. Target UMF ~ SiO2 2.8, Al2O3 0.32, B2O3 0.39, CaO 0.64, MgO 0.06, KNaO 0.30. */
     private static Map<String, Double> lowMidFireBase() {
         var formula = new LinkedHashMap<String, Double>();
-        formula.put(FERRO_FRIT_3134, 35.0);
-        formula.put(POTASH_FELDSPAR, 18.0);
-        formula.put(SILICA, 20.0);
-        formula.put(EPK_KAOLIN, 16.0);
-        formula.put(WHITING, 9.0);
+        formula.put(FERRO_FRIT_3134, 37.0);
+        formula.put(POTASH_FELDSPAR, 21.0);
+        formula.put(SILICA, 14.0);
+        formula.put(EPK_KAOLIN, 17.0);
+        formula.put(WHITING, 6.0);
+        formula.put(DOLOMITE, 3.0);
         formula.put(BENTONITE, 2.0);
         return formula;
     }
@@ -112,10 +119,12 @@ public final class RecipeBaseFactory {
     }
 
     private static Map<String, Double> baseForTemp(int tempC) {
-        if (tempC < 1000) return lowFireBase();
-        if (tempC < 1120) return lowMidFireBase();
-        if (tempC < CONE_6_LOWER_BOUND) return midFireBase();
-        if (tempC < CONE_6_UPPER_BOUND) return cone6Base();
-        return highFireBase();
+        return switch (FiringBand.of(tempC)) {
+            case LOW -> lowFireBase();
+            case LOW_MID -> lowMidFireBase();
+            case MID -> midFireBase();
+            case CONE_6 -> cone6Base();
+            case HIGH -> highFireBase();
+        };
     }
 }

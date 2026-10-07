@@ -132,8 +132,8 @@ These are smaller, and most would resolve with items 4–5.
 1. ~~Add a 1200–1250 °C boron-bearing base (fixes #1).~~ Done — see Round 1.
 2. ~~Raise opacifier levels (fixes #3).~~ Done — see Round 1.
 3. ~~Cap combined Li₂O at ~0.10 (fixes #4, most of #6).~~ Done — see Round 1.
-4. Rework the matte modifier per temperature band (fixes #2 finish, #5).
-5. Split 1000 vs. 1100 bases and trim low-fire silica/alumina (fixes #2 limits).
+4. ~~Rework the matte modifier per temperature band (fixes #2 finish, #5).~~ Done — see Round 2.
+5. ~~Split 1000 vs. 1100 bases and trim low-fire silica/alumina (fixes #2 limits).~~ Done — see Round 2.
 
 After any tuning, re-run `GeneratedRecipeLimitsTest` and compare the printed report;
 the hard invariants protect against regressions and the reference tests guard the
@@ -141,7 +141,7 @@ calculator and analyzer.
 
 ## Round 1 tuning — applied
 
-Steps 1–3 above were implemented; steps 4–5 remain open.
+Steps 1–3 above were implemented in this round.
 
 | Change | Where |
 |---|---|
@@ -171,3 +171,58 @@ SiO₂/Al₂O₃/CaO excursions (66 / 24 / 36+36), 1186 Matte → Satin (46), an
 1285 matte limits (SiO₂ < 3.0 ×26, KNaO < 0.2 ×24, Al₂O₃ < 0.3 ×17).
 
 All 117 backend tests pass (98 existing + 19 validation).
+
+## Round 2 tuning — applied
+
+Steps 4–5: band-aware surface chemistry and split low-fire bases.
+
+| Change | Where |
+|---|---|
+| New `FiringBand` enum (LOW < 1060, LOW_MID < 1120, MID < 1200, CONE_6 < 1260, HIGH) replaces scattered temperature thresholds in the base factory, modifier and narrative. | `recipe/FiringBand` |
+| `lowFireBase()` (cone 06–04): Frit 3134 52, Frit 3124 14, EPK 20, Silica 12, Bentonite 2 (≈ SiO₂ 2.8, Al₂O₃ 0.28, B₂O₃ 0.61, CaO 0.68, KNaO 0.32). Frit 3124 brings alumina so the glaze is no longer pure 3134 + clay. | `RecipeBaseFactory` |
+| `lowMidFireBase()` (cone 03–02): Frit 3134 37, Potash Feldspar 21, Silica 14, EPK 17, Whiting 6, Dolomite 3, Bentonite 2 (≈ SiO₂ 2.8, Al₂O₃ 0.32, B₂O₃ 0.39, CaO 0.64, KNaO 0.30). | `RecipeBaseFactory` |
+| Fluxed variant per band: low fire +6 frit / −3 silica / −3 whiting; cone 6 unchanged from Round 1; mid/high +3 Li carb / −3 feldspar (the silica cut was dropped — lithium alone already lowers SiO₂). | `RecipeBaseFactory.fluxedBase` |
+| High-Silica variant: +4 silica / −1 EPK (was +5 / −3) so the Si:Al ratio — and a matte request — survives the variant. | `RecipeBaseFactory.highSilicaBase` |
+| Matte modifier rewritten per band. Low fire swaps boron frit for alumina frit, kaolin and **talc** (−22 Frit 3134, +12 Frit 3124, +8 EPK, +14 Talc, +3 Whiting, −12 Silica): a classic magnesia matte. Mid: +6 Dolomite, +6 EPK, −4 feldspar, −2 whiting. Cone 6: +6 Dolomite, +6 EPK, −7 Silica, −4 frit, −2 whiting, +2 feldspar. High: +6 Dolomite, +6 EPK, −4 Silica, −3 whiting, +3 feldspar. Wollastonite is no longer used for mattes. | `RecipeModifier.applyMatteAdjustments` |
+| Satin is a partial matte dose per band (LOW 0.85, LOW_MID 0.55, MID 0.3, CONE_6/HIGH 0.6) — the pure-frit low-fire base sits far up the gloss curve so it needs most of the swap; the zinc/dolomite mid-fire base needs very little. | `RecipeModifier.satinDose` |
+| Glossy: +1.5 silica at low fire (3.0 elsewhere), frit addition only above low fire, −4 dolomite at mid fire (−2 elsewhere). | `RecipeModifier.applySurfaceAdjustments` |
+| Translucent: +1.5 silica, no longer cuts EPK (a translucent matte stays matte). | `RecipeModifier.applyOpacityAdjustments` |
+| Talc and Ferro Frit 3124 promoted from builder-only to generator materials; flux-system narrative per band; tooltips for both materials in the frontend. | `RecipeIngredients`, `RecipeNarrativeBuilder`, `frontend/src/app/constants.ts` |
+| Audit report accepts `-Daudit.sample=N` to print more than 4 examples per category. | `GeneratedRecipeLimitsTest` |
+
+### Audit before → after (405 recipes)
+
+| Finding | After Round 1 | After Round 2 |
+|---|---|---|
+| Requested Satin → Glossy | 85 | 8 (all High-Silica/Low-stability stacks) |
+| Requested Matte → Glossy | 77 | 0 |
+| Requested Matte → Satin | 46 | 31 (all Low-stability or High-Silica variants) |
+| Requested Satin → Matte | 6 | 27 (all High-stability or 10 % zircon opaque, gloss 0.27–0.40) |
+| Requested Glossy → Satin | 20 | 15 (1186/1285 Opaque: zircon + tin read as satin, gloss 0.61–0.68) |
+| Requested Semi-opaque → Translucent | 10 | 12 (Low-stability low fire, opacity 0.36–0.40) |
+| Requested Semi-opaque → Opaque | 0 | 9 (1222/1285 Matte+High, opacity 0.70–0.75) |
+| SiO₂ > 3.0 at 1000 | 66 | 7 (Glossy High-Silica, 3.02–3.24) |
+| SiO₂ > 3.3 at 1100 | 29 | 8 (Glossy High-Silica / Opaque) |
+| CaO > 0.7 at 1000 / 1100 | 36 / 36 | 0 / 0 |
+| Al₂O₃ > 0.30 at 1000 | 24 | 33 — all Matte/Satin, 0.30–0.36 |
+| Al₂O₃ > 0.35 at 1100 | 0 | 24 — all Matte/Satin, 0.35–0.39 |
+| B₂O₃ > 0.6 at 1000 | 0 | 18 (Glossy, 0.61–0.62) |
+| SiO₂ < 2.2 at 1186 | 19 | 6 (Fluxed mattes, 2.13–2.20) |
+| SiO₂ < 3.0 at 1285 | 26 | 12 (Fluxed mattes/satins, 2.82–2.98) |
+| KNaO < 0.2 at 1285 | 24 | 12 (mattes, 0.19–0.20) |
+| Al₂O₃ < 0.3 at 1285 | 17 | 0 |
+| Al₂O₃ < 0.25 / SiO₂ < 2.5 at 1222 | 6 / 6 | 0 / 2 |
+| Durability Soft | 22 | 0 |
+| Melt Stiff / Runny / Underfired | 0 | 0 |
+
+Every Balanced-variant recipe with Medium stability now lands in the requested
+surface band at all five temperatures. The remaining surface mismatches are
+stacked requests pulling in opposite directions — a *fluid* matte, a *stiff* or
+10 %-zircon satin, a high-silica matte — where the analyzer's "wrong" label is
+arguably the honest answer. The low-fire alumina excursions (0.30–0.39) are
+intentional: that is where talc/kaolin mattes live, and the limit tables are
+written for glossy glazes. B₂O₃ 0.61–0.62 at 1000 °C is a rounding-margin
+artefact of a frit-only flux system.
+
+All 118 backend tests pass (99 service/controller + 19 validation; the matte
+test in `GlazeRecipeServiceTest` was split into a mid-fire and a low-fire case).

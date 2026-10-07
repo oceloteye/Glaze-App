@@ -7,6 +7,7 @@ import java.util.stream.Collectors;
 import com.glaze.backend.dto.GlazeRequest;
 import static com.glaze.backend.service.recipe.RecipeIngredients.COLORANT_KEYS;
 import static com.glaze.backend.service.recipe.RecipeIngredients.DOLOMITE;
+import static com.glaze.backend.service.recipe.RecipeIngredients.FERRO_FRIT_3124;
 import static com.glaze.backend.service.recipe.RecipeIngredients.FERRO_FRIT_3134;
 import static com.glaze.backend.service.recipe.RecipeIngredients.POTASH_FELDSPAR;
 
@@ -82,11 +83,13 @@ public final class RecipeNarrativeBuilder {
     }
 
     public static String fluxSystemDescription(int tempC, String feldspar) {
-        if (tempC < 1000) return "Low-fire frit base (" + FERRO_FRIT_3134 + ") — alumina/silica supplied by kaolin";
-        if (tempC < 1120) return "Transitional base combining soft frit with " + feldspar + " for mid-range firing";
-        if (tempC < 1200) return "Mid-fire mineral base using " + feldspar + ", " + DOLOMITE + ", and Zinc Oxide as fluxes";
-        if (tempC < 1260) return "Cone 6 " + feldspar + " base with " + FERRO_FRIT_3134 + " boron to complete the melt";
-        return "High-fire " + feldspar + " base — silica and kaolin provide the glass network";
+        return switch (FiringBand.of(tempC)) {
+            case LOW -> "Low-fire frit base (" + FERRO_FRIT_3134 + " with " + FERRO_FRIT_3124 + ") — alumina supplied by kaolin";
+            case LOW_MID -> "Transitional base combining soft frit with " + feldspar + " for mid-range firing";
+            case MID -> "Mid-fire mineral base using " + feldspar + ", " + DOLOMITE + ", and Zinc Oxide as fluxes";
+            case CONE_6 -> "Cone 6 " + feldspar + " base with " + FERRO_FRIT_3134 + " boron to complete the melt";
+            case HIGH -> "High-fire " + feldspar + " base — silica and kaolin provide the glass network";
+        };
     }
 
     public static String firingRangeFor(int tempC) {

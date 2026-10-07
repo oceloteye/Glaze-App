@@ -480,11 +480,21 @@ class GlazeRecipeServiceTest {
     // ── Surface finish adjustments ────────────────────────────────────────────
 
     @Test
-    void matteFinishAddsWollastonite() {
-        var recipes = service.generateRecipes(
-                request("#ffffff", 1220, "Matte", "Medium", List.of(), 50, null));
-        var balanced = getBalanced(recipes);
-        assertThat(balanced.ingredients()).containsKey("Wollastonite");
+    void matteFinishRaisesMagnesiaAndAluminaAgainstSilica() {
+        var glossy = getBalanced(service.generateRecipes(
+                request("#ffffff", 1220, "Glossy", "Medium", List.of(), 50, null))).ingredients();
+        var matte = getBalanced(service.generateRecipes(
+                request("#ffffff", 1220, "Matte", "Medium", List.of(), 50, null))).ingredients();
+        assertThat(matte.getOrDefault("Dolomite", 0.0)).isGreaterThan(glossy.getOrDefault("Dolomite", 0.0));
+        assertThat(matte.getOrDefault("EPK Kaolin", 0.0)).isGreaterThan(glossy.getOrDefault("EPK Kaolin", 0.0));
+        assertThat(matte.getOrDefault("Silica", 0.0)).isLessThan(glossy.getOrDefault("Silica", 0.0));
+    }
+
+    @Test
+    void lowFireMatteUsesTalcAndAluminaFrit() {
+        var matte = getBalanced(service.generateRecipes(
+                request("#ffffff", 1000, "Matte", "Medium", List.of(), 50, null))).ingredients();
+        assertThat(matte).containsKeys("Talc", "Ferro Frit 3124");
     }
 
     // ── Recipe name format ────────────────────────────────────────────────────
