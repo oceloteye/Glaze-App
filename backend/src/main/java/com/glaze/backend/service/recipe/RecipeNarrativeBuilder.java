@@ -16,23 +16,23 @@ public final class RecipeNarrativeBuilder {
     private RecipeNarrativeBuilder() {
     }
 
-    public static String recipeName(String variant, GlazeRequest request) {
+    public static String recipeName(String label, GlazeRequest request) {
         String finish = capitalize(request.surfaceFinish());
         String range = firingRangeShort(request.firingTempC());
-        return switch (variant) {
-            case RecipeVariants.HIGH_SILICA -> finish + " " + range + " — " + RecipeVariants.HIGH_SILICA;
-            case RecipeVariants.FLUXED -> finish + " " + range + " — " + RecipeVariants.FLUXED;
-            default -> finish + " " + range + " — " + RecipeVariants.BALANCED;
-        };
+        return finish + " " + range + " — " + label;
     }
 
-    public static String buildRationale(String variant, GlazeRequest request, Map<String, Double> formula) {
+    public static String buildRationale(String meltVariant, String routeSummary, GlazeRequest request, Map<String, Double> formula) {
         var rationale = new StringBuilder();
         String feldspar = selectedFeldsparName(request.feldsparSubstitute());
 
         rationale.append(fluxSystemDescription(request.firingTempC(), feldspar)).append(". ");
 
-        rationale.append(switch (variant) {
+        if (routeSummary != null && !routeSummary.isBlank()) {
+            rationale.append(routeSummary.strip()).append(' ');
+        }
+
+        rationale.append(switch (meltVariant) {
             case RecipeVariants.HIGH_SILICA -> "Extra Silica raises durability and reduces crawling — well suited for functional work.";
             case RecipeVariants.FLUXED -> request.firingTempC() < 1120
                     ? "Elevated Frit content promotes a fluid, glossy melt and vibrant colour response."
