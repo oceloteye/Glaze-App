@@ -22,6 +22,11 @@ export type ReferenceGlaze = {
   recipe: Record<string, number>
   looksLike: string
   expect: ColorBand
+  /**
+   * Materials that define this glaze's chemistry (e.g. chrome for a chrome green). When set, the generator
+   * is expected to offer at least one variant that reaches the colour *this* way, not merely a colour match.
+   */
+  signature?: string[]
 }
 
 // 5x20 (G1214M): the standard cone 6 glossy clear base, used here as a neutral vehicle for single colorants.
@@ -82,6 +87,7 @@ export const REFERENCE_GLAZES: ReferenceGlaze[] = [
     },
     looksLike: 'rust / brick red breaking to black where thin',
     expect: { hue: [5, 25], sat: [0.45, 0.85], light: [0.25, 0.45] },
+    signature: ['Red Iron Oxide', 'Gerstley Borate'],
   },
   {
     name: 'Tenmoku (Leach + 10% RIO)',
@@ -100,6 +106,7 @@ export const REFERENCE_GLAZES: ReferenceGlaze[] = [
     recipe: withColorants(LEACH, { 'Red Iron Oxide': 2 }),
     looksLike: 'pale translucent blue-grey-green',
     expect: { hue: [130, 190], sat: [0.05, 0.35], light: [0.55, 0.8] },
+    signature: ['Red Iron Oxide'],
   },
   {
     name: 'Floating Blue',
@@ -153,6 +160,7 @@ export const REFERENCE_GLAZES: ReferenceGlaze[] = [
     recipe: { 'Nepheline Syenite': 50, 'Gerstley Borate': 25, Silica: 20, 'EPK Kaolin': 5, 'Copper Carbonate': 3 },
     looksLike: 'turquoise',
     expect: { hue: [165, 200], sat: [0.3, 0.7], light: [0.4, 0.6] },
+    signature: ['Copper Carbonate', 'Nepheline Syenite'],
   },
   {
     name: 'Copper red (reduction)',
@@ -162,6 +170,7 @@ export const REFERENCE_GLAZES: ReferenceGlaze[] = [
     recipe: withColorants(LEACH, { 'Copper Carbonate': 0.5, 'Tin Oxide': 1 }),
     looksLike: 'oxblood / sang de boeuf red',
     expect: { hue: [340, 15], sat: [0.4, 0.85], light: [0.25, 0.5] },
+    signature: ['Copper Carbonate', 'Tin Oxide'],
   },
   {
     name: 'Chrome-tin pink',
@@ -171,6 +180,7 @@ export const REFERENCE_GLAZES: ReferenceGlaze[] = [
     recipe: withColorants(FIVE_BY_TWENTY, { 'Tin Oxide': 5, 'Chrome Oxide': 0.2 }),
     looksLike: 'opaque rose pink',
     expect: { hue: [330, 10], sat: [0.25, 0.7], light: [0.55, 0.78] },
+    signature: ['Tin Oxide', 'Chrome Oxide'],
   },
   {
     name: 'Rutile tan (5x20 + 6% rutile)',
@@ -216,6 +226,7 @@ export const REFERENCE_GLAZES: ReferenceGlaze[] = [
     recipe: { 'Custer Feldspar': 48, Silica: 24, Whiting: 12, 'Bone Ash': 7, Talc: 4.5, 'Red Iron Oxide': 12 },
     looksLike: 'persimmon / rust red-brown, black where thick',
     expect: { hue: [8, 30], sat: [0.35, 0.75], light: [0.22, 0.42] },
+    signature: ['Red Iron Oxide', 'Bone Ash'],
   },
   {
     name: 'Olive celadon (Leach + 4% RIO)',
@@ -234,6 +245,7 @@ export const REFERENCE_GLAZES: ReferenceGlaze[] = [
     recipe: withColorants(LEACH, { 'Bone Ash': 4, 'Red Iron Oxide': 1 }),
     looksLike: 'milky opalescent pale blue',
     expect: { hue: [185, 235], sat: [0.08, 0.4], light: [0.6, 0.85] },
+    signature: ['Bone Ash'],
   },
   {
     name: 'Shino (spodumene / nepheline)',
@@ -261,6 +273,7 @@ export const REFERENCE_GLAZES: ReferenceGlaze[] = [
     recipe: withColorants(FIVE_BY_TWENTY, { 'Chrome Oxide': 2 }),
     looksLike: 'opaque leaf green',
     expect: { hue: [90, 150], sat: [0.15, 0.5], light: [0.3, 0.55] },
+    signature: ['Chrome Oxide'],
   },
   {
     name: 'Nickel blue (zinc base)',
@@ -270,6 +283,7 @@ export const REFERENCE_GLAZES: ReferenceGlaze[] = [
     recipe: withColorants(FIVE_BY_TWENTY, { 'Zinc Oxide': 10, 'Nickel Oxide': 1 }),
     looksLike: 'soft blue / blue-violet',
     expect: { hue: [205, 260], sat: [0.15, 0.5], light: [0.45, 0.7] },
+    signature: ['Nickel Oxide', 'Zinc Oxide'],
   },
   {
     name: 'Nickel green (magnesia matte)',
@@ -279,6 +293,7 @@ export const REFERENCE_GLAZES: ReferenceGlaze[] = [
     recipe: { 'Potash Feldspar': 45, Dolomite: 22, 'EPK Kaolin': 23, Silica: 10, 'Nickel Oxide': 1.5 },
     looksLike: 'muted grey-green / khaki',
     expect: { hue: [60, 140], sat: [0.08, 0.35], light: [0.4, 0.65] },
+    signature: ['Nickel Oxide'],
   },
   {
     name: 'Barium copper blue',
@@ -288,6 +303,7 @@ export const REFERENCE_GLAZES: ReferenceGlaze[] = [
     recipe: { 'Potash Feldspar': 40, 'Barium Carbonate': 30, 'EPK Kaolin': 10, Silica: 20, 'Copper Carbonate': 3 },
     looksLike: 'turquoise blue, matte',
     expect: { hue: [170, 210], sat: [0.25, 0.65], light: [0.4, 0.62] },
+    signature: ['Barium Carbonate', 'Copper Carbonate'],
   },
   {
     name: 'Ochre (5x20 + 3% yellow iron oxide)',
@@ -413,6 +429,7 @@ export const REFERENCE_GLAZES: ReferenceGlaze[] = [
     recipe: withColorants(FIVE_BY_TWENTY, { 'Zinc Oxide': 10, 'Chrome Oxide': 1 }),
     looksLike: 'tan to medium brown',
     expect: { hue: [15, 45], sat: [0.2, 0.55], light: [0.35, 0.6] },
+    signature: ['Zinc Oxide', 'Chrome Oxide'],
   },
   {
     name: 'Slate grey (5x20 + 2% RIO + 0.3% cobalt)',
@@ -431,6 +448,7 @@ export const REFERENCE_GLAZES: ReferenceGlaze[] = [
     recipe: withColorants(FIVE_BY_TWENTY, { 'Chrome Oxide': 0.5 }),
     looksLike: 'soft leaf green',
     expect: { hue: [80, 150], sat: [0.1, 0.4], light: [0.5, 0.72] },
+    signature: ['Chrome Oxide'],
   },
 ]
 

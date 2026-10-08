@@ -191,6 +191,27 @@ public final class RecipeModifier {
      * the generic base is replaced by the canonical recipe for that family.
      */
     private static boolean applyArchetypeBase(Map<String, Double> formula, String hex, int tempC, String atmosphere) {
+        Archetype archetype = matchArchetype(hex, tempC, atmosphere);
+        if (archetype == null) {
+            return false;
+        }
+        replace(formula, archetype.recipe());
+        return true;
+    }
+
+    /** Name of the whole-recipe family the colour ask maps to, or null when a generic base plus colourants is used. */
+    public static String archetypeName(String hex, int tempC, String atmosphere) {
+        if (!isValidHex(hex)) {
+            return null;
+        }
+        Archetype archetype = matchArchetype(hex, tempC, normalizeAtmosphere(atmosphere));
+        return archetype == null ? null : archetype.name();
+    }
+
+    private record Archetype(String name, Map<String, Double> recipe) {
+    }
+
+    private static Archetype matchArchetype(String hex, int tempC, String atmosphere) {
         double[] hsl = RecipeColorUtil.hexToHsl(hex);
         double h = hsl[0], s = hsl[1], l = hsl[2];
         boolean reduction = ATMOSPHERE_REDUCTION.equals(atmosphere);
@@ -198,30 +219,27 @@ public final class RecipeModifier {
 
         if (!reduction && redHue && s >= 0.45 && l >= 0.2 && l <= 0.45 && tempC >= 1150 && tempC <= 1260) {
             // Randy's Red family: iron-saturated boron/talc melt that recrystallises to rust on cooling
-            replace(formula, Map.of(GERSTLEY_BORATE, 32.0, SILICA, 30.0, POTASH_FELDSPAR, 20.0, TALC, 14.0,
-                    EPK_KAOLIN, 5.0, RED_IRON_OXIDE, 15.0, BENTONITE, 2.0));
-            return true;
+            return new Archetype("Iron-saturate red (Randy's Red)", Map.of(GERSTLEY_BORATE, 32.0, SILICA, 30.0,
+                    POTASH_FELDSPAR, 20.0, TALC, 14.0, EPK_KAOLIN, 5.0, RED_IRON_OXIDE, 15.0, BENTONITE, 2.0));
         }
         if (reduction && tempC >= 1250) {
             if (h >= 5 && h < 30 && s >= 0.4 && l >= 0.15 && l <= 0.35) {
                 // Ohata kaki: saturated iron re-oxidising over bone ash / talc seeds
-                replace(formula, Map.of(CUSTER_FELDSPAR, 48.0, SILICA, 24.0, WHITING, 12.0, BONE_ASH, 7.0,
-                        TALC, 4.5, RED_IRON_OXIDE, 12.0));
-                return true;
+                return new Archetype("Iron-saturate kaki", Map.of(CUSTER_FELDSPAR, 48.0, SILICA, 24.0, WHITING, 12.0,
+                        BONE_ASH, 7.0, TALC, 4.5, RED_IRON_OXIDE, 12.0));
             }
             if ((h >= 330 || h < 8) && s >= 0.3 && l >= 0.3 && l <= 0.55) {
                 // copper red: a trace of copper and tin in a lime glossy
-                replace(formula, Map.of(POTASH_FELDSPAR, 40.0, SILICA, 30.0, WHITING, 20.0, EPK_KAOLIN, 10.0,
-                        COPPER_CARBONATE, 0.5, TIN_OXIDE, 1.0));
-                return true;
+                return new Archetype("Copper red", Map.of(POTASH_FELDSPAR, 40.0, SILICA, 30.0, WHITING, 20.0,
+                        EPK_KAOLIN, 10.0, COPPER_CARBONATE, 0.5, TIN_OXIDE, 1.0));
             }
             if (h >= 20 && h < 45 && s >= 0.3 && l >= 0.6) {
                 // shino: high-alumina soda/lithium melt, no lime, flashes orange where thin
-                replace(formula, Map.of(NEPHELINE_SYENITE, 50.0, SPODUMENE, 25.0, EPK_KAOLIN, 15.0, BALL_CLAY, 10.0));
-                return true;
+                return new Archetype("Shino", Map.of(NEPHELINE_SYENITE, 50.0, SPODUMENE, 25.0, EPK_KAOLIN, 15.0,
+                        BALL_CLAY, 10.0));
             }
         }
-        return false;
+        return null;
     }
 
     private static void replace(Map<String, Double> formula, Map<String, Double> recipe) {
