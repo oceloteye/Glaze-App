@@ -4,23 +4,31 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import static com.glaze.backend.service.recipe.RecipeIngredients.BALL_CLAY;
 import static com.glaze.backend.service.recipe.RecipeIngredients.BENTONITE;
+import static com.glaze.backend.service.recipe.RecipeIngredients.BONE_ASH;
+import static com.glaze.backend.service.recipe.RecipeIngredients.CHROME_OXIDE;
 import static com.glaze.backend.service.recipe.RecipeIngredients.COBALT_CARBONATE;
 import static com.glaze.backend.service.recipe.RecipeIngredients.COPPER_CARBONATE;
+import static com.glaze.backend.service.recipe.RecipeIngredients.CUSTER_FELDSPAR;
 import static com.glaze.backend.service.recipe.RecipeIngredients.DOLOMITE;
 import static com.glaze.backend.service.recipe.RecipeIngredients.EPK_KAOLIN;
 import static com.glaze.backend.service.recipe.RecipeIngredients.FERRO_FRIT_3124;
 import static com.glaze.backend.service.recipe.RecipeIngredients.FERRO_FRIT_3134;
+import static com.glaze.backend.service.recipe.RecipeIngredients.GERSTLEY_BORATE;
 import static com.glaze.backend.service.recipe.RecipeIngredients.ILMENITE_GRANULAR;
 import static com.glaze.backend.service.recipe.RecipeIngredients.IRON_CHROMATE;
 import static com.glaze.backend.service.recipe.RecipeIngredients.IRON_OXIDE;
 import static com.glaze.backend.service.recipe.RecipeIngredients.LITHIUM_CARBONATE;
 import static com.glaze.backend.service.recipe.RecipeIngredients.MANGANESE_DIOXIDE;
 import static com.glaze.backend.service.recipe.RecipeIngredients.MANGANESE_GRANULES;
+import static com.glaze.backend.service.recipe.RecipeIngredients.NEPHELINE_SYENITE;
+import static com.glaze.backend.service.recipe.RecipeIngredients.NICKEL_OXIDE;
 import static com.glaze.backend.service.recipe.RecipeIngredients.POTASH_FELDSPAR;
 import static com.glaze.backend.service.recipe.RecipeIngredients.RED_IRON_OXIDE;
 import static com.glaze.backend.service.recipe.RecipeIngredients.RUTILE;
 import static com.glaze.backend.service.recipe.RecipeIngredients.SILICA;
+import static com.glaze.backend.service.recipe.RecipeIngredients.SPODUMENE;
 import static com.glaze.backend.service.recipe.RecipeIngredients.TALC;
 import static com.glaze.backend.service.recipe.RecipeIngredients.TIN_OXIDE;
 import static com.glaze.backend.service.recipe.RecipeIngredients.TITANIUM_DIOXIDE;
@@ -166,12 +174,59 @@ public final class RecipeModifier {
                                       String atmosphere) {
         String character = normalizeCharacter(colorCharacter);
         String atmosphereMode = normalizeAtmosphere(atmosphere);
+        if (isValidHex(primary) && applyArchetypeBase(formula, primary, tempC, atmosphereMode)) {
+            return;
+        }
         if (isValidHex(primary)) {
             addColorantFromHex(formula, primary, 1.0, character, tempC, atmosphereMode);
         }
         if (isValidHex(secondary)) {
             addColorantFromHex(formula, secondary, 0.35, character, tempC, atmosphereMode);
         }
+    }
+
+    /**
+     * Some colours only exist as a whole recipe family, not as a colourant added to a generic base:
+     * saturated iron reds, kaki, copper reds and shino. When the ask lands squarely in one of those
+     * the generic base is replaced by the canonical recipe for that family.
+     */
+    private static boolean applyArchetypeBase(Map<String, Double> formula, String hex, int tempC, String atmosphere) {
+        double[] hsl = RecipeColorUtil.hexToHsl(hex);
+        double h = hsl[0], s = hsl[1], l = hsl[2];
+        boolean reduction = ATMOSPHERE_REDUCTION.equals(atmosphere);
+        boolean redHue = h < 30 || h >= 330;
+
+        if (!reduction && redHue && s >= 0.45 && l >= 0.2 && l <= 0.45 && tempC >= 1150 && tempC <= 1260) {
+            // Randy's Red family: iron-saturated boron/talc melt that recrystallises to rust on cooling
+            replace(formula, Map.of(GERSTLEY_BORATE, 32.0, SILICA, 30.0, POTASH_FELDSPAR, 20.0, TALC, 14.0,
+                    EPK_KAOLIN, 5.0, RED_IRON_OXIDE, 15.0, BENTONITE, 2.0));
+            return true;
+        }
+        if (reduction && tempC >= 1250) {
+            if (h >= 5 && h < 30 && s >= 0.4 && l >= 0.15 && l <= 0.35) {
+                // Ohata kaki: saturated iron re-oxidising over bone ash / talc seeds
+                replace(formula, Map.of(CUSTER_FELDSPAR, 48.0, SILICA, 24.0, WHITING, 12.0, BONE_ASH, 7.0,
+                        TALC, 4.5, RED_IRON_OXIDE, 12.0));
+                return true;
+            }
+            if ((h >= 330 || h < 8) && s >= 0.3 && l >= 0.3 && l <= 0.55) {
+                // copper red: a trace of copper and tin in a lime glossy
+                replace(formula, Map.of(POTASH_FELDSPAR, 40.0, SILICA, 30.0, WHITING, 20.0, EPK_KAOLIN, 10.0,
+                        COPPER_CARBONATE, 0.5, TIN_OXIDE, 1.0));
+                return true;
+            }
+            if (h >= 20 && h < 45 && s >= 0.3 && l >= 0.6) {
+                // shino: high-alumina soda/lithium melt, no lime, flashes orange where thin
+                replace(formula, Map.of(NEPHELINE_SYENITE, 50.0, SPODUMENE, 25.0, EPK_KAOLIN, 15.0, BALL_CLAY, 10.0));
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static void replace(Map<String, Double> formula, Map<String, Double> recipe) {
+        formula.clear();
+        formula.putAll(recipe);
     }
 
     public static void applyEffectAgents(Map<String, Double> formula, List<String> effects,
@@ -247,21 +302,71 @@ public final class RecipeModifier {
         double h = hsl[0], s = hsl[1], l = hsl[2];
         boolean purpleZone = isPurpleZone(h);
         boolean oxidation = ATMOSPHERE_OXIDATION.equals(atmosphere);
+        boolean reduction = !oxidation;
+        boolean warm = h < 60 || h >= 330;
         double chromaFactor = applyCharacterChroma(0.55 + (0.9 * s), colorCharacter);
         double darkFactor = RecipeMath.clamp01((0.52 - l) / 0.52);
         double lightFactor = RecipeMath.clamp01((l - 0.48) / 0.52);
+        // how far below "pale" the ask sits; iron doses scale with this so a honey is not dosed like a brick
+        double depth = RecipeMath.clamp01((0.9 - l) / 0.5);
+        // cobalt is strong enough that low-saturation blues need a fraction of the full dose
+        double satScale = cobaltSatScale(s);
 
-        if (l < 0.12) {
-            RecipeMath.adjust(formula, RED_IRON_OXIDE, 7.0 * weight);
-            RecipeMath.adjust(formula, COBALT_CARBONATE, 1.5 * weight);
-            RecipeMath.adjust(formula, MANGANESE_DIOXIDE, 3.0 * weight);
-        } else if (s < 0.12 || l > 0.87) {
+        if (l > 0.87 || (s < 0.12 && l > 0.7)) {
             RecipeMath.adjust(formula, ZIRCOPAX, 9.0 * weight);
-        } else if ((h < 30) || h >= 330) {
-            RecipeMath.adjust(formula, RED_IRON_OXIDE, 7.0 * weight * chromaFactor);
+            return;
+        }
+        if (s < 0.12) {
+            // neutral grey / khaki: nickel, darkened with a little iron and manganese
+            RecipeMath.adjust(formula, NICKEL_OXIDE, 1.2 * weight * (1.0 - l));
+            RecipeMath.adjust(formula, RED_IRON_OXIDE, 2.5 * weight * darkFactor);
+            RecipeMath.adjust(formula, MANGANESE_DIOXIDE, 0.8 * weight * darkFactor);
+            return;
+        }
+        boolean ironSaturate = warm && s >= 0.15 && s < 0.45 && l < 0.26;
+        if (l < 0.18 || ironSaturate) {
+            if (warm && s >= 0.15) {
+                // tenmoku: ~10% iron once normalised; below that the melt sits at yellow-brown
+                RecipeMath.adjust(formula, RED_IRON_OXIDE, 11.0 * weight);
+            } else {
+                // black: iron carries the load, cobalt only kills the brown
+                RecipeMath.adjust(formula, RED_IRON_OXIDE, 9.0 * weight);
+                RecipeMath.adjust(formula, COBALT_CARBONATE, 1.8 * weight);
+                RecipeMath.adjust(formula, MANGANESE_DIOXIDE, 2.5 * weight);
+            }
+            return;
+        }
+        if (reduction && h >= 80 && h < 200 && s < 0.32 && l >= 0.45) {
+            // celadon family: iron alone, blue-grey at a trace and olive as it builds
+            double dose = h < 120 ? 2.0 + 4.5 * (1.0 - l) : 0.6 + 2.2 * (1.0 - l);
+            RecipeMath.adjust(formula, RED_IRON_OXIDE, dose * weight);
+            return;
+        }
+        if (reduction && h >= 195 && h < 225 && s < 0.35 && l >= 0.6) {
+            // chun: phosphate opalescence over a trace of iron
+            RecipeMath.adjust(formula, BONE_ASH, 4.0 * weight);
+            RecipeMath.adjust(formula, RED_IRON_OXIDE, 1.0 * weight);
+            return;
+        }
+        if ((h >= 330 || h < 15) && l >= 0.6 && s >= 0.3 && s <= 0.6) {
+            // chrome-tin pink
+            RecipeMath.adjust(formula, TIN_OXIDE, 5.0 * weight);
+            RecipeMath.adjust(formula, CHROME_OXIDE, 0.25 * weight);
+            return;
+        }
+        if (h >= 300 && s < 0.4 && l >= 0.3) {
+            // manganese plum
+            RecipeMath.adjust(formula, MANGANESE_DIOXIDE, 4.0 * weight * chromaFactor + 2.5 * weight * darkFactor);
+            RecipeMath.adjust(formula, RED_IRON_OXIDE, 0.5 * weight);
+            return;
+        }
+
+        if ((h < 30) || h >= 330) {
+            RecipeMath.adjust(formula, RED_IRON_OXIDE, 7.0 * weight * chromaFactor * RecipeMath.clamp01(depth + 0.3));
         } else if (h < 60) {
-            RecipeMath.adjust(formula, RED_IRON_OXIDE, 4.0 * weight * chromaFactor);
-            RecipeMath.adjust(formula, RUTILE, 3.0 * weight * (0.7 + 0.6 * s));
+            // honey / amber: iron builds faster than linearly with depth so tans stay pale and ambers go deep
+            RecipeMath.adjust(formula, RED_IRON_OXIDE, 4.0 * weight * chromaFactor * depth + 4.0 * weight * chromaFactor * depth * depth);
+            RecipeMath.adjust(formula, RUTILE, 3.0 * weight * (0.7 + 0.6 * s) * RecipeMath.clamp01(depth * 1.6));
         } else if (h < 80) {
             RecipeMath.adjust(formula, RUTILE, 5.5 * weight * (0.7 + 0.6 * s));
             RecipeMath.adjust(formula, YELLOW_IRON_OXIDE, 2.0 * weight * chromaFactor);
@@ -276,26 +381,35 @@ public final class RecipeModifier {
                 RecipeMath.adjust(formula, YELLOW_IRON_OXIDE, 0.5 * weight * (0.5 + 0.8 * s));
                 RecipeMath.adjust(formula, RED_IRON_OXIDE, 0.5 * weight * darkFactor);
             } else {
+                // turquoise: copper in an alkaline melt, no cobalt
                 RecipeMath.adjust(formula, COPPER_CARBONATE, 2.6 * weight * chromaFactor);
-                RecipeMath.adjust(formula, COBALT_CARBONATE, 0.35 * weight * (0.5 + 0.8 * s));
                 RecipeMath.adjust(formula, ZIRCOPAX, 1.8 * weight * lightFactor);
+                if (s >= 0.25) {
+                    moveToAlkalineFlux(formula);
+                }
             }
         } else if (h < 220) {
             RecipeMath.adjust(formula, COPPER_CARBONATE, 2.5 * weight * chromaFactor);
-            RecipeMath.adjust(formula, COBALT_CARBONATE, 0.4 * weight * (0.7 + 0.7 * s));
+            if (h >= 200) {
+                RecipeMath.adjust(formula, COBALT_CARBONATE, 0.4 * weight * (0.7 + 0.7 * s) * satScale);
+            } else if (s >= 0.25) {
+                moveToAlkalineFlux(formula);
+            }
         } else if (h < 260) {
             if (l < 0.30) {
-                RecipeMath.adjust(formula, COBALT_CARBONATE, 1.45 * weight * chromaFactor);
+                RecipeMath.adjust(formula, COBALT_CARBONATE, 1.45 * weight * chromaFactor * satScale);
                 RecipeMath.adjust(formula, MANGANESE_DIOXIDE, 0.9 * weight * (0.6 + darkFactor));
                 RecipeMath.adjust(formula, RED_IRON_OXIDE, 0.35 * weight * darkFactor);
             } else if (l > 0.66) {
-                RecipeMath.adjust(formula, COBALT_CARBONATE, 0.95 * weight * chromaFactor);
+                RecipeMath.adjust(formula, COBALT_CARBONATE, 0.95 * weight * chromaFactor * satScale);
                 RecipeMath.adjust(formula, COPPER_CARBONATE, 0.55 * weight * (0.4 + 0.6 * s));
                 RecipeMath.adjust(formula, ZIRCOPAX, 2.6 * weight * lightFactor);
             } else {
-                RecipeMath.adjust(formula, COBALT_CARBONATE, 1.2 * weight * chromaFactor);
+                RecipeMath.adjust(formula, COBALT_CARBONATE, 1.2 * weight * chromaFactor * satScale);
                 RecipeMath.adjust(formula, COPPER_CARBONATE, 0.25 * weight * (0.4 + 0.6 * s));
             }
+            // low-saturation blues are rutile blues: titania breaks the cobalt into a milky slate
+            RecipeMath.adjust(formula, RUTILE, 2.5 * weight * RecipeMath.clamp01((0.28 - s) / 0.12));
         } else {
             if (purpleZone) {
                 double tempBias = (tempC - 1000.0) / 220.0;
@@ -312,6 +426,8 @@ public final class RecipeModifier {
         if (darkFactor > 0.0) {
             if (purpleZone && oxidation) {
                 RecipeMath.adjust(formula, MANGANESE_DIOXIDE, 0.35 * weight * darkFactor);
+            } else if (warm) {
+                RecipeMath.adjust(formula, RED_IRON_OXIDE, 3.5 * weight * darkFactor);
             } else {
                 RecipeMath.adjust(formula, RED_IRON_OXIDE, 2.2 * weight * darkFactor);
                 RecipeMath.adjust(formula, MANGANESE_DIOXIDE, 1.1 * weight * darkFactor);
@@ -333,6 +449,23 @@ public final class RecipeModifier {
         }
     }
 
+    /** Cobalt dose scale for a given saturation: a floor so dusty blues still read blue, full dose from s≈0.4. */
+    private static double cobaltSatScale(double s) {
+        return RecipeMath.clamp01((s - 0.06) / 0.34);
+    }
+
+    /** Copper only goes turquoise in a soda/lithium melt: swap potash feldspar for nepheline syenite and the calcium frit for the soda frit. */
+    private static void moveToAlkalineFlux(Map<String, Double> formula) {
+        Double potash = formula.remove(POTASH_FELDSPAR);
+        if (potash != null) {
+            RecipeMath.adjust(formula, NEPHELINE_SYENITE, potash);
+        }
+        Double calciumFrit = formula.remove(FERRO_FRIT_3124);
+        if (calciumFrit != null) {
+            RecipeMath.adjust(formula, FERRO_FRIT_3134, calciumFrit);
+        }
+    }
+
     private static void applyRealWorldHueBias(Map<String, Double> formula,
                                              double h,
                                              double s,
@@ -345,25 +478,26 @@ public final class RecipeModifier {
                                              String atmosphere) {
         double zoneFactor = firingZoneFactor(tempC);
         boolean reduction = ATMOSPHERE_REDUCTION.equals(atmosphere);
+        double depth = RecipeMath.clamp01((0.9 - l) / 0.5);
 
         if (h < 60) {
-            RecipeMath.adjust(formula, RED_IRON_OXIDE, 0.55 * weight * (0.5 + 0.8 * s) * zoneFactor);
-            RecipeMath.adjust(formula, RUTILE, 0.85 * weight * (0.5 + 0.9 * s) * zoneFactor);
-            RecipeMath.adjust(formula, YELLOW_IRON_OXIDE, 0.35 * weight * chromaFactor * zoneFactor);
+            RecipeMath.adjust(formula, RED_IRON_OXIDE, 0.55 * weight * (0.5 + 0.8 * s) * zoneFactor * depth);
+            RecipeMath.adjust(formula, RUTILE, 0.85 * weight * (0.5 + 0.9 * s) * zoneFactor * depth);
+            RecipeMath.adjust(formula, YELLOW_IRON_OXIDE, 0.35 * weight * chromaFactor * zoneFactor * depth);
         } else if (h < 105) {
             RecipeMath.adjust(formula, YELLOW_IRON_OXIDE, 0.65 * weight * chromaFactor * zoneFactor);
             RecipeMath.adjust(formula, RUTILE, 0.7 * weight * (0.55 + 0.8 * s) * zoneFactor);
             RecipeMath.adjust(formula, COPPER_CARBONATE, 0.2 * weight * (0.3 + 0.6 * s) * zoneFactor);
         } else if (h < 180) {
             RecipeMath.adjust(formula, COPPER_CARBONATE, 0.75 * weight * chromaFactor * zoneFactor);
-            RecipeMath.adjust(formula, YELLOW_IRON_OXIDE, 0.4 * weight * (0.5 + 0.7 * s) * zoneFactor);
+            RecipeMath.adjust(formula, YELLOW_IRON_OXIDE, 0.4 * weight * (0.5 + 0.7 * s) * zoneFactor * (h < 150 ? 1.0 : 0.0));
             RecipeMath.adjust(formula, ZIRCOPAX, 0.35 * weight * lightFactor * zoneFactor);
         } else if (h < 220) {
             RecipeMath.adjust(formula, COPPER_CARBONATE, 0.55 * weight * chromaFactor * zoneFactor);
-            RecipeMath.adjust(formula, COBALT_CARBONATE, 0.45 * weight * (0.4 + 0.8 * s) * zoneFactor);
+            RecipeMath.adjust(formula, COBALT_CARBONATE, 0.45 * weight * (0.4 + 0.8 * s) * zoneFactor * (h >= 200 ? 1.0 : 0.0));
             RecipeMath.adjust(formula, ZIRCOPAX, 0.55 * weight * lightFactor * zoneFactor);
         } else if (h < 260) {
-            RecipeMath.adjust(formula, COBALT_CARBONATE, 0.55 * weight * chromaFactor * zoneFactor);
+            RecipeMath.adjust(formula, COBALT_CARBONATE, 0.55 * weight * chromaFactor * zoneFactor * cobaltSatScale(s));
             RecipeMath.adjust(formula, MANGANESE_DIOXIDE, 0.25 * weight * (0.4 + darkFactor + 0.7 * s) * zoneFactor);
             RecipeMath.adjust(formula, COPPER_CARBONATE, 0.2 * weight * (0.4 + 0.8 * s) * zoneFactor);
         } else {
@@ -372,22 +506,25 @@ public final class RecipeModifier {
             RecipeMath.adjust(formula, COBALT_CARBONATE, 0.18 * weight * (0.3 + 0.7 * s) * zoneFactor);
         }
 
+        // manganese and cobalt only deepen cool hues; on warm asks they just muddy the colour
+        boolean cool = h >= 200 && h < 330;
+        double coolDepth = cool ? (1.0 - lightFactor) : 0.0;
         if (tempC < 1000) {
             RecipeMath.adjust(formula, ZIRCOPAX, 0.45 * weight * lightFactor);
-            RecipeMath.adjust(formula, COBALT_CARBONATE, 0.15 * weight * chromaFactor);
+            RecipeMath.adjust(formula, COBALT_CARBONATE, 0.15 * weight * chromaFactor * coolDepth);
         } else if (tempC < 1120) {
-            RecipeMath.adjust(formula, COPPER_CARBONATE, 0.18 * weight * chromaFactor);
+            RecipeMath.adjust(formula, COPPER_CARBONATE, 0.18 * weight * chromaFactor * (h >= 80 && h < 220 ? 1.0 : 0.0));
             RecipeMath.adjust(formula, SILICA, 0.22 * weight);
         } else if (tempC < 1200) {
-            RecipeMath.adjust(formula, MANGANESE_DIOXIDE, 0.24 * weight * (0.5 + s));
-            RecipeMath.adjust(formula, COBALT_CARBONATE, 0.12 * weight * (0.4 + s));
+            RecipeMath.adjust(formula, MANGANESE_DIOXIDE, 0.24 * weight * (0.5 + s) * coolDepth);
+            RecipeMath.adjust(formula, COBALT_CARBONATE, 0.12 * weight * (0.4 + s) * coolDepth);
         } else if (tempC < 1260) {
-            RecipeMath.adjust(formula, MANGANESE_DIOXIDE, 0.35 * weight * (0.6 + s));
-            RecipeMath.adjust(formula, COBALT_CARBONATE, 0.18 * weight * (0.5 + s));
+            RecipeMath.adjust(formula, MANGANESE_DIOXIDE, 0.35 * weight * (0.6 + s) * coolDepth);
+            RecipeMath.adjust(formula, COBALT_CARBONATE, 0.18 * weight * (0.5 + s) * coolDepth);
             RecipeMath.adjust(formula, ZIRCOPAX, 0.22 * weight * lightFactor);
         } else {
-            RecipeMath.adjust(formula, MANGANESE_DIOXIDE, 0.42 * weight * (0.6 + s));
-            RecipeMath.adjust(formula, COBALT_CARBONATE, 0.22 * weight * (0.5 + s));
+            RecipeMath.adjust(formula, MANGANESE_DIOXIDE, 0.42 * weight * (0.6 + s) * coolDepth);
+            RecipeMath.adjust(formula, COBALT_CARBONATE, 0.22 * weight * (0.5 + s) * coolDepth);
         }
 
         if (reduction && (h >= 110 && h <= 220)) {
@@ -501,7 +638,6 @@ public final class RecipeModifier {
 
         if (RecipeColorUtil.isRobinsEggZone(h, s, l)) {
             RecipeMath.adjust(formula, COPPER_CARBONATE, 0.75 * weight);
-            RecipeMath.adjust(formula, COBALT_CARBONATE, 0.35 * weight);
             RecipeMath.adjust(formula, ZIRCOPAX, 1.3 * weight);
             RecipeMath.adjust(formula, RUTILE, 0.3 * weight);
         }
@@ -515,7 +651,6 @@ public final class RecipeModifier {
 
         if (RecipeColorUtil.isSeafoamMintZone(h, s, l)) {
             RecipeMath.adjust(formula, COPPER_CARBONATE, 0.9 * weight);
-            RecipeMath.adjust(formula, COBALT_CARBONATE, 0.22 * weight);
             RecipeMath.adjust(formula, ZIRCOPAX, 1.7 * weight);
             RecipeMath.adjust(formula, SILICA, 0.35 * weight);
         }

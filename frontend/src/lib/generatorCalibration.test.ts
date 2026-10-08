@@ -13,13 +13,27 @@ import { describeMiss, formatHsl, hexToHsl } from './colorBands'
 const GENERATOR_URL = import.meta.env.GENERATOR_URL as string | undefined
 
 type Suggestion = { name: string; ingredients: Record<string, number> }
-type Result = { ref: ReferenceGlaze; asked: string; variants: { name: string; hex: string; misses: string[] }[] }
+type Variant = { name: string; hex: string; misses: string[]; ingredients: Record<string, number> }
+type Result = { ref: ReferenceGlaze; asked: string; variants: Variant[] }
+
+const BASE_MATERIALS = new Set([
+  'Potash Feldspar', 'Custer Feldspar', 'Soda Feldspar', 'Nepheline Syenite', 'Ferro Frit 3134', 'Ferro Frit 3124',
+  'Whiting', 'Wollastonite', 'Dolomite', 'Talc', 'Gerstley Borate', 'Lithium Carbonate', 'Spodumene',
+  'Strontium Carbonate', 'EPK Kaolin', 'Ball Clay', 'Bentonite', 'Silica',
+])
+
+function colourants(ingredients: Record<string, number>) {
+  return Object.entries(ingredients)
+    .filter(([name, amount]) => !BASE_MATERIALS.has(name) && amount > 0.05)
+    .map(([name, amount]) => `${name} ${amount.toFixed(2)}`)
+    .join(', ')
+}
 
 function requestFor(ref: ReferenceGlaze, asked: string) {
   return {
     color: asked,
     firingTempC: ref.tempC,
-    surfaceFinish: 'Glossy',
+    surfaceFinish: /matte/i.test(`${ref.name} ${ref.looksLike}`) ? 'Matte' : 'Glossy',
     stability: 'Medium',
     opacity: /opaque|white/i.test(ref.looksLike) ? 'Opaque' : 'Translucent',
     effects: [],
@@ -40,7 +54,12 @@ async function roundTrip(ref: ReferenceGlaze): Promise<Result> {
   const { recipes } = (await response.json()) as { recipes: Suggestion[] }
   const variants = recipes.map((recipe) => {
     const hex = predictGlazeColor(toPercentages(recipe.ingredients), ref.reduction, ref.tempC)
-    return { name: recipe.name.split('—').pop()!.trim(), hex, misses: describeMiss(hexToHsl(hex), ref.expect) }
+    return {
+      name: recipe.name.split('—').pop()!.trim(),
+      hex,
+      misses: describeMiss(hexToHsl(hex), ref.expect),
+      ingredients: recipe.ingredients,
+    }
   })
   return { ref, asked, variants }
 }
@@ -55,7 +74,8 @@ describe.runIf(GENERATOR_URL)('generator round-trips the reference glazes', () =
     const rows = all.map(({ ref, asked, variants }) => {
       const hits = variants.filter((v) => v.misses.length === 0).length
       const summary = variants.map((v) => `${v.name} ${v.hex}${v.misses.length ? ' ✗' : ''}`).join('  ')
-      return `${hits}/${variants.length}  asked ${formatHsl(asked)}  ${ref.name.padEnd(42)} ${summary}`
+      const detail = import.meta.env.PRINT_COLORS ? `\n      ${colourants(variants[0].ingredients)}` : ''
+      return `${hits}/${variants.length}  asked ${formatHsl(asked)}  ${ref.name.padEnd(42)} ${summary}${detail}`
     })
     console.log('\n' + rows.join('\n'))
   }, 60_000)
