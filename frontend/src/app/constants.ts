@@ -210,7 +210,7 @@ export const INGREDIENT_INFO: Record<string, IngredientInfo> = {
   },
   'Red Iron Oxide': {
     role: 'Colorant',
-    description: 'The most common iron colorant. Amber and honey in oxidation, celadon greens and tenmoku blacks in reduction; also fluxes the glaze.',
+    description: 'The most common iron colorant. Amber and honey in oxidation, celadon greens and tenmoku blacks in reduction; also fluxes the glaze. At 10–15% in a fluid boron + talc base it recrystallises into rust "iron reds" on a slow cool.',
   },
   'Yellow Iron Oxide': {
     role: 'Colorant',
