@@ -1,6 +1,5 @@
 package com.glaze.backend.service.recipe;
 
-import java.util.ArrayList;
 import java.util.Map;
 
 public final class RecipeMath {
@@ -37,20 +36,22 @@ public final class RecipeMath {
     }
 
     public static void normalize(Map<String, Double> formula) {
+        formula.entrySet().removeIf(entry -> entry.getValue() <= 0.0);
         double total = formula.values().stream().mapToDouble(Double::doubleValue).sum();
         if (total == 0.0) return;
-        var keys = new ArrayList<>(formula.keySet());
+        // Round each share, then push the rounding residue onto the largest ingredient
+        // so a trace material never absorbs a phantom 0.01.
+        String largest = null;
         double running = 0.0;
-        for (int i = 0; i < keys.size(); i++) {
-            String key = keys.get(i);
-            if (i == keys.size() - 1) {
-                formula.put(key, roundTwo(100.0 - running));
-            } else {
-                double normalized = roundTwo(formula.get(key) / total * 100.0);
-                formula.put(key, normalized);
-                running += normalized;
+        for (var entry : formula.entrySet()) {
+            double normalized = roundTwo(entry.getValue() / total * 100.0);
+            entry.setValue(normalized);
+            running += normalized;
+            if (largest == null || normalized > formula.get(largest)) {
+                largest = entry.getKey();
             }
         }
+        formula.put(largest, roundTwo(formula.get(largest) + (100.0 - running)));
         formula.entrySet().removeIf(entry -> entry.getValue() <= 0.0);
     }
 
