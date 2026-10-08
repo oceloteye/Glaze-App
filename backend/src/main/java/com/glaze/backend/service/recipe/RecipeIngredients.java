@@ -29,11 +29,11 @@ final class RecipeIngredients {
     static final String RED_IRON_OXIDE = "Red Iron Oxide";
     static final String YELLOW_IRON_OXIDE = "Yellow Iron Oxide";
     static final String LITHIUM_CARBONATE = "Lithium Carbonate";
+    static final String FERRO_FRIT_3124 = "Ferro Frit 3124";
+    static final String TALC = "Talc";
 
     // Builder-only materials (not used by the generator's base recipes).
     static final String CUSTER_FELDSPAR = "Custer Feldspar";
-    static final String FERRO_FRIT_3124 = "Ferro Frit 3124";
-    static final String TALC = "Talc";
     static final String GERSTLEY_BORATE = "Gerstley Borate";
     static final String BALL_CLAY = "Ball Clay";
     static final String SPODUMENE = "Spodumene";

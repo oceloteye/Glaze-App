@@ -128,6 +128,10 @@ export const INGREDIENT_INFO: Record<string, IngredientInfo> = {
     role: 'Low-temperature flux',
     description: 'Pre-melted calcium-boron-sodium glass. Melts early and evenly, adds gloss and clarity, and carries low- and mid-fire glazes without raw soluble materials.',
   },
+  'Ferro Frit 3124': {
+    role: 'Low-temperature flux',
+    description: 'A boron frit that also carries alumina, so it makes a more complete glaze on its own than Frit 3134 and is less prone to running.',
+  },
   'EPK Kaolin': {
     role: 'Alumina source / suspension',
     description: 'Pure clay that supplies alumina for stiffness and durability, keeps the raw glaze suspended in the bucket, and helps it adhere to the pot before firing.',
@@ -139,6 +143,10 @@ export const INGREDIENT_INFO: Record<string, IngredientInfo> = {
   Dolomite: {
     role: 'Calcium + magnesium flux',
     description: 'Supplies both calcium and magnesium. Magnesium gives a buttery, satin-to-matte surface and softens colours toward pastel tones.',
+  },
+  Talc: {
+    role: 'Magnesium flux / silica source',
+    description: 'Magnesium silicate. Lowers expansion and promotes buttery satin-matte surfaces; the usual magnesia source in low-fire mattes.',
   },
   Wollastonite: {
     role: 'Calcium flux / silica source',
