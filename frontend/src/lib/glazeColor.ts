@@ -102,9 +102,11 @@ export function predictGlazeColor(recipe: Record<string, number>, reduction: boo
   if (chrome > 0) {
     // chrome-tin pink: a trace of chrome in a tin-opacified base; the stain forms readily
     const pinkWithTin = (recipe['Tin Oxide'] ?? 0) > 2 && chrome < 1
+    // zinc chromate: chrome goes brown instead of green once there is real zinc in the melt
+    const zincBrown = clamp01(((recipe['Zinc Oxide'] ?? 0) - 3) / 5)
     color = pinkWithTin
       ? lerp(color, [206, 124, 138], strength(chrome, 0.15))
-      : lerp(color, [74, 112, 70], strength(chrome, 1))
+      : lerp(color, lerp([74, 112, 70], [134, 92, 58], zincBrown), strength(chrome, 1))
   }
 
   const copper = (recipe['Copper Carbonate'] ?? 0) * 0.72 + (recipe['Copper Oxide'] ?? 0)
@@ -128,14 +130,16 @@ export function predictGlazeColor(recipe: Record<string, number>, reduction: boo
   if (cobalt > 0) {
     const softened = pct(recipe, ['Dolomite', 'Talc']) > 10
     const target: Rgb = softened ? [92, 112, 168] : [30, 52, 148]
-    color = lerp(color, target, strength(cobalt, 0.35))
+    // an iron-saturated melt masks the blue; cobalt there only deepens it toward black
+    const ironMask = clamp01((8 - iron) / 4)
+    color = lerp(color, target, strength(cobalt, 0.35) * ironMask)
     // titania breaks cobalt into a milky, variegated slate (floating / rutile blues)
     if (rutile > 0) color = lerp(color, [110, 130, 150], strength(rutile, 4) * clamp01(cobalt / 0.4))
   }
 
   // Stacked colorants saturate to black regardless of hue (iron that has gone to rust crystals excepted).
   const load =
-    iron * (1 - ironRed) + cobalt * 4 + copper * 1.5 + manganese + chrome * 2 + nickel * 2
+    iron * (1 - ironRed) + cobalt * 5 + copper * 1.5 + manganese * 1.5 + chrome * 2 + nickel * 2
   color = lerp(color, BLACK, clamp01((load - 9) / 7))
 
   return hex(color)
