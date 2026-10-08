@@ -52,7 +52,10 @@ export function useRecipeBuilder() {
   }, [rows, totalParts])
 
   const reduction = atmosphere === 'Reduction'
-  const previewColor = useMemo(() => predictGlazeColor(percentages, reduction), [percentages, reduction])
+  const previewColor = useMemo(
+    () => predictGlazeColor(percentages, reduction, firingTempC),
+    [percentages, reduction, firingTempC],
+  )
 
   useEffect(() => {
     if (rows.length === 0 || totalParts <= 0) return

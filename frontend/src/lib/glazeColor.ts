@@ -39,18 +39,18 @@ function ironEquivalent(recipe: Record<string, number>) {
 
 /**
  * 0–1: how strongly an iron-saturate will recrystallise to rust red on cooling.
- * Needs lots of iron and magnesia/phosphate to seed the crystals; in oxidation it also needs a fluid boron melt,
- * in reduction (kaki) the saturated high-fire melt re-oxidises on its own.
+ * Needs lots of iron, magnesia/phosphate to seed the crystals, and enough heat to melt it fully;
+ * in oxidation it also needs a fluid boron melt, in reduction (kaki) the saturated high-fire melt re-oxidises on its own.
  */
-export function ironRedStrength(recipe: Record<string, number>, reduction: boolean) {
+export function ironRedStrength(recipe: Record<string, number>, reduction: boolean, firingTempC = 1222) {
   const iron = ironEquivalent(recipe)
   const seed = clamp01((pct(recipe, ['Talc', 'Bone Ash', 'Dolomite']) - 5) / 8)
-  if (reduction) return clamp01((iron - 9) / 3) * seed
+  if (reduction) return clamp01((iron - 9) / 3) * seed * clamp01((firingTempC - 1200) / 70)
   const boron = pct(recipe, ['Gerstley Borate', 'Ferro Frit 3134', 'Ferro Frit 3124'])
-  return clamp01((iron - 8) / 4) * clamp01((boron - 10) / 15) * seed
+  return clamp01((iron - 8) / 4) * clamp01((boron - 10) / 15) * seed * clamp01((firingTempC - 1100) / 80)
 }
 
-export function predictGlazeColor(recipe: Record<string, number>, reduction: boolean): string {
+export function predictGlazeColor(recipe: Record<string, number>, reduction: boolean, firingTempC = 1222): string {
   let color = reduction ? BASE_CLEAR_REDUCTION : BASE_CLEAR
 
   // tin opacifies at roughly half the dose zircon needs
@@ -58,11 +58,19 @@ export function predictGlazeColor(recipe: Record<string, number>, reduction: boo
   color = lerp(color, WHITE, strength(opacifier, 6))
 
   const iron = ironEquivalent(recipe)
-  const ironRed = ironRedStrength(recipe, reduction)
+  const ironRed = ironRedStrength(recipe, reduction, firingTempC)
   if (iron > 0) {
-    const light: Rgb = reduction ? [150, 184, 160] : [205, 150, 80]
-    const dark: Rgb = reduction ? [40, 30, 24] : [58, 36, 22]
-    let target = lerp(light, dark, clamp01((iron - 2) / 7))
+    const t = clamp01((iron - 2) / 7)
+    let target: Rgb
+    if (reduction) {
+      // celadon blue-grey at a trace, olive as Fe3+ builds, tenmoku brown-black when saturated
+      const celadon: Rgb = [146, 180, 176]
+      const olive: Rgb = [120, 138, 96]
+      const tenmoku: Rgb = [40, 30, 24]
+      target = t < 0.3 ? lerp(celadon, olive, t / 0.3) : lerp(olive, tenmoku, (t - 0.3) / 0.7)
+    } else {
+      target = lerp([205, 150, 80], [58, 36, 22], t)
+    }
     target = lerp(target, [150, 52, 30], ironRed)
     color = lerp(color, target, strength(iron, reduction ? 3 : 3.5))
   }
@@ -101,7 +109,10 @@ export function predictGlazeColor(recipe: Record<string, number>, reduction: boo
 
   const copper = (recipe['Copper Carbonate'] ?? 0) * 0.72 + (recipe['Copper Oxide'] ?? 0)
   if (copper > 0) {
-    const alkaline = pct(recipe, ['Nepheline Syenite', 'Soda Feldspar', 'Lithium Carbonate', 'Barium Carbonate']) > 25
+    const alkaline =
+      pct(recipe, ['Nepheline Syenite', 'Soda Feldspar', 'Lithium Carbonate', 'Barium Carbonate']) +
+        (recipe['Ferro Frit 3134'] ?? 0) * 0.5 >
+      25
     const green: Rgb = alkaline ? [72, 170, 165] : [62, 134, 78]
     if (reduction) {
       // copper red only forms from a trace; a few percent stays green (oribe) even in reduction
@@ -118,6 +129,8 @@ export function predictGlazeColor(recipe: Record<string, number>, reduction: boo
     const softened = pct(recipe, ['Dolomite', 'Talc']) > 10
     const target: Rgb = softened ? [92, 112, 168] : [30, 52, 148]
     color = lerp(color, target, strength(cobalt, 0.35))
+    // titania breaks cobalt into a milky, variegated slate (floating / rutile blues)
+    if (rutile > 0) color = lerp(color, [110, 130, 150], strength(rutile, 4) * clamp01(cobalt / 0.4))
   }
 
   // Stacked colorants saturate to black regardless of hue (iron that has gone to rust crystals excepted).
