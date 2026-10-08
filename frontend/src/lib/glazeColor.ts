@@ -24,22 +24,40 @@ function strength(amount: number, sensitivity: number) {
 
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v))
 
+/** Iron colorants on a red-iron-equivalent basis. */
+function ironEquivalent(recipe: Record<string, number>) {
+  return (
+    pct(recipe, ['Red Iron Oxide', 'Iron Oxide']) +
+    (recipe['Yellow Iron Oxide'] ?? 0) * 0.9 +
+    (recipe['Ilmenite (granular)'] ?? 0) * 0.5 +
+    (recipe['Iron Chromate'] ?? 0) * 0.3
+  )
+}
+
+/**
+ * 0–1: how strongly an oxidation iron-saturate will recrystallise to rust red on cooling.
+ * Needs lots of iron (>= ~8%), a fluid boron melt, and magnesia/phosphate to seed the crystals.
+ */
+export function ironRedStrength(recipe: Record<string, number>, reduction: boolean) {
+  if (reduction) return 0
+  const iron = ironEquivalent(recipe)
+  const boron = pct(recipe, ['Gerstley Borate', 'Ferro Frit 3134', 'Ferro Frit 3124'])
+  const crystalHelpers = pct(recipe, ['Talc', 'Bone Ash', 'Dolomite'])
+  return clamp01((iron - 8) / 4) * clamp01((boron - 10) / 15) * clamp01((crystalHelpers - 5) / 8)
+}
+
 export function predictGlazeColor(recipe: Record<string, number>, reduction: boolean): string {
   let color = BASE_CLEAR
 
   const opacifier = pct(recipe, ['Zircopax', 'Tin Oxide', 'Titanium Dioxide'])
   color = lerp(color, WHITE, strength(opacifier, 6))
 
-  // Iron oxides (yellow iron is a little weaker by weight).
-  const iron =
-    pct(recipe, ['Red Iron Oxide', 'Iron Oxide']) +
-    (recipe['Yellow Iron Oxide'] ?? 0) * 0.9 +
-    (recipe['Ilmenite (granular)'] ?? 0) * 0.5 +
-    (recipe['Iron Chromate'] ?? 0) * 0.3
+  const iron = ironEquivalent(recipe)
   if (iron > 0) {
     const light: Rgb = reduction ? [164, 190, 170] : [205, 150, 80]
     const dark: Rgb = reduction ? [40, 30, 24] : [58, 36, 22]
-    const target = lerp(light, dark, clamp01((iron - 2) / 7))
+    let target = lerp(light, dark, clamp01((iron - 2) / 7))
+    target = lerp(target, [150, 52, 30], ironRedStrength(recipe, reduction))
     color = lerp(color, target, strength(iron, reduction ? 3 : 3.5))
   }
 
