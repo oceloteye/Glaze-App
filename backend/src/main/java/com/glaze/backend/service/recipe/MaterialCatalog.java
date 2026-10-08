@@ -132,7 +132,7 @@ public final class MaterialCatalog {
 
             // ── Colorants ──────────────────────────────────────────────────────
             material(RED_IRON_OXIDE, COLORANTS, "Colorant",
-                    "The most common iron colorant. Amber and honey in oxidation, celadon greens and tenmoku blacks in reduction; also a flux.",
+                    "The most common iron colorant. Amber and honey in oxidation, celadon greens and tenmoku blacks in reduction; also a flux. At 10–15% in a fluid boron + talc base it recrystallises into rust 'iron reds' on a slow cool.",
                     Map.of(FE2O3, 100.0), null, null, 12),
             material(YELLOW_IRON_OXIDE, COLORANTS, "Colorant",
                     "Fine iron hydroxide that disperses evenly for smooth tans and yellows; slightly weaker than red iron by weight.",

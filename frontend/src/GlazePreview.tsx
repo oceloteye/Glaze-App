@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { ironRedStrength } from './lib/glazeColor'
 
 interface Props {
   color: string
@@ -348,6 +349,7 @@ function drawGlaze(
   stability: string = 'High',
   opacityTarget: string = 'Semi-opaque',
   foodSafe: boolean = false,
+  reduction: boolean = false,
 ) {
   if (!/^#[0-9a-fA-F]{6}$/.test(color)) color = '#808080'
   const secHex = secondaryColor && /^#[0-9a-fA-F]{6}$/.test(secondaryColor) ? secondaryColor : null
@@ -356,6 +358,7 @@ function drawGlaze(
   ctx.clearRect(0, 0, w, h)
 
   const chemistry = deriveChemistry(recipeIngredients, firingTempC, stability, opacityTarget, foodSafe)
+  const ironRed = recipeIngredients ? ironRedStrength(recipeIngredients, reduction) : 0
   const melt = chemistry.melt
   // a fluid dab slumps and runs, so it is set smaller and higher to leave room for the tongues
   const cx = w / 2
@@ -791,6 +794,33 @@ function drawGlaze(
     ctx.fillRect(0, bottomY - poolH * 1.5, w, poolH * 1.2)
   }
 
+  // ── iron saturate: rust crystals grow where the coat is thick; it breaks to black where thin ──
+  if (ironRed > 0.05) {
+    const topY = cy - radius
+    const grain = makeNoise(rng, 7)
+    const black: Rgb = { r: 28, g: 16, b: 12 }
+    const ember: Rgb = { r: 196, g: 84, b: 36 }
+    paintLayer(
+      ctx,
+      noiseLayer(144, (x, y) => {
+        // thickness: thin at the crown and toward the rim, thick at the foot; the grain mottles it
+        const ny = (y * h - topY) / (bottomY - topY)
+        const dx = (x * w - cx) / radius
+        const dy = (y * h - cy) / radius
+        const dist = Math.sqrt(dx * dx + dy * dy)
+        // the rim is thinnest at the crown; the foot carries the heaviest glass
+        const rimThin = clamp((dist - 0.6) / 0.4, 0, 1) * (1 - ny * 0.7)
+        const thickness = clamp(ny * 0.8 + 0.1 - rimThin * 0.9 + (grain(x * 1.4, y * 0.8, 3) - 0.5) * 0.7, 0, 1)
+        if (thickness < 0.42) return [black.r, black.g, black.b, clamp((0.42 - thickness) * 3, 0, 1) * 0.9 * ironRed]
+        // crystalline bloom in the thick zones: a brighter rust that glints
+        const bloom = clamp((grain(x * 3 + 7, y * 3 + 3, 2) - 0.52) * 4, 0, 1) * clamp((thickness - 0.5) * 2, 0, 1)
+        return [ember.r, ember.g, ember.b, bloom * 0.7 * ironRed]
+      }),
+      w,
+      h,
+    )
+  }
+
   // ── surface-finish sheen ──────────────────────────────────────
   const finishTarget =
     surfaceFinish === 'Glossy' ? 0.92 : surfaceFinish === 'Satin' ? 0.55 : 0.2
@@ -835,7 +865,8 @@ function drawGlaze(
 
   // ── edge break: glaze thins at the rim and shows the clay through ──
   // (clipped to the plain outline: the runs are the thickest glass, so they don't break)
-  const breakStrength = clamp(0.35 - chemistry.opacity * 0.3 + chemistry.flow * 0.15, 0.04, 0.4)
+  // an iron saturate breaks to black instead of to bare clay
+  const breakStrength = clamp(0.35 - chemistry.opacity * 0.3 + chemistry.flow * 0.15, 0.04, 0.4) * (1 - ironRed * 0.85)
   ctx.save()
   discPath(ctx, cx, cy, radius, sag)
   ctx.clip()
@@ -929,8 +960,9 @@ export function GlazePreview({
       stability,
       opacity,
       foodSafe,
+      atmosphere?.toLowerCase() === 'reduction',
     )
-  }, [color, surfaceFinish, effect, secondaryColor, intensity, recipeIngredients, firingTempC, stability, opacity, foodSafe])
+  }, [color, surfaceFinish, effect, secondaryColor, intensity, recipeIngredients, firingTempC, stability, opacity, foodSafe, atmosphere])
 
   const validColor = /^#[0-9a-fA-F]{6}$/.test(color) ? color : '#808080'
   const meltLabel = stability === 'Low' ? 'Fluid melt' : stability === 'High' ? 'Stiff melt' : null
