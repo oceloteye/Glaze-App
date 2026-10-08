@@ -184,6 +184,12 @@ export function RecipeResultsPanel({ composer }: Props) {
                   <h3>{recipe.name}</h3>
                   <span>{recipe.firingRange}</span>
                 </div>
+                {recipe.route && recipe.route.signature.length > 0 && (
+                  <p className="recipe-route">
+                    <span className="recipe-route-label">Colour from</span>{' '}
+                    {recipe.route.signature.join(' + ')}
+                  </p>
+                )}
                 <p>{recipe.rationale}</p>
                 <IngredientGroup title="Base glaze" entries={base} />
                 <IngredientGroup title="Colorants & additives" entries={colorants} />

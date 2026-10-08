@@ -39,12 +39,27 @@ class GlazeRecipeServiceTest {
     }
 
     @Test
-    void recipeNamesContainBalancedHighSilicaFluxed() {
+    void recipeNamesCarryTheColourRouteAndAreDistinct() {
         var recipes = service.generateRecipes(basicRequest("#3a6bc1", 1220));
         var names = recipes.stream().map(recipe -> recipe.name()).toList();
-        assertThat(names).anyMatch(n -> n.contains("Balanced"));
+        assertThat(names).doesNotHaveDuplicates();
+        assertThat(names).allMatch(n -> n.contains(" — "));
+        assertThat(recipes).allMatch(recipe -> recipe.route() != null && !recipe.route().name().isBlank());
+        // a saturated royal blue has one plausible route (cobalt), so the melt variants fill the other slots
+        assertThat(names).anyMatch(n -> n.contains("Cobalt") && n.contains("Balanced"));
         assertThat(names).anyMatch(n -> n.contains("High-Silica"));
         assertThat(names).anyMatch(n -> n.contains("Fluxed"));
+    }
+
+    @Test
+    void mutedGreenOffersDistinctColourantRoutes() {
+        var recipes = service.generateRecipes(basicRequest("#5f7e58", 1220));
+        var routes = recipes.stream().map(recipe -> recipe.route().name()).toList();
+        assertThat(recipes.stream().map(RecipeSuggestion::name)).doesNotHaveDuplicates();
+        assertThat(routes).anyMatch(n -> n.contains("Chrome"));
+        var chrome = recipes.stream().filter(r -> r.route().name().contains("Chrome")).findFirst().orElseThrow();
+        assertThat(chrome.ingredients().getOrDefault("Chrome Oxide", 0.0)).isGreaterThan(0.1);
+        assertThat(chrome.route().signature()).contains("Chrome Oxide");
     }
 
     // ── Ingredient totals normalize to 100 % ─────────────────────────────────
@@ -96,7 +111,7 @@ class GlazeRecipeServiceTest {
     @Test
     void lowFireBaseUsesFrit() {
         var recipes = service.generateRecipes(basicRequest("#ffffff", 980));
-        var balanced = recipes.stream().filter(r -> r.name().contains("Balanced")).findFirst().orElseThrow();
+        var balanced = getBalanced(recipes);
         assertThat(balanced.ingredients()).containsKey("Ferro Frit 3134");
         assertThat(balanced.ingredients()).doesNotContainKey("Potash Feldspar");
     }
@@ -104,7 +119,7 @@ class GlazeRecipeServiceTest {
     @Test
     void highFireBaseUsesFeldspar() {
         var recipes = service.generateRecipes(basicRequest("#ffffff", 1300));
-        var balanced = recipes.stream().filter(r -> r.name().contains("Balanced")).findFirst().orElseThrow();
+        var balanced = getBalanced(recipes);
         assertThat(balanced.ingredients()).containsKey("Potash Feldspar");
         assertThat(balanced.ingredients()).doesNotContainKey("Ferro Frit 3134");
     }
@@ -114,28 +129,28 @@ class GlazeRecipeServiceTest {
     @Test
     void blueColorAddsCobalCarbonate() {
         var recipes = service.generateRecipes(basicRequest("#0000cc", 1220));
-        var balanced = recipes.stream().filter(r -> r.name().contains("Balanced")).findFirst().orElseThrow();
+        var balanced = getBalanced(recipes);
         assertThat(balanced.ingredients()).containsKey("Cobalt Carbonate");
     }
 
     @Test
     void greenColorAddsCopperCarbonate() {
         var recipes = service.generateRecipes(basicRequest("#00aa00", 1220));
-        var balanced = recipes.stream().filter(r -> r.name().contains("Balanced")).findFirst().orElseThrow();
+        var balanced = getBalanced(recipes);
         assertThat(balanced.ingredients()).containsKey("Copper Carbonate");
     }
 
     @Test
     void redColorAddsIronOxide() {
         var recipes = service.generateRecipes(basicRequest("#cc0000", 1220));
-        var balanced = recipes.stream().filter(r -> r.name().contains("Balanced")).findFirst().orElseThrow();
+        var balanced = getBalanced(recipes);
         assertThat(balanced.ingredients()).containsKey("Red Iron Oxide");
     }
 
     @Test
     void whiteColorAddsZircopax() {
         var recipes = service.generateRecipes(basicRequest("#f0f0f0", 1220));
-        var balanced = recipes.stream().filter(r -> r.name().contains("Balanced")).findFirst().orElseThrow();
+        var balanced = getBalanced(recipes);
         assertThat(balanced.ingredients()).containsKey("Zircopax");
     }
 
@@ -272,7 +287,7 @@ class GlazeRecipeServiceTest {
     void speckledEffectAddsIlmenite() {
         var recipes = service.generateRecipes(
                 request("#ffffff", 1220, "Satin", "Medium", List.of("Speckled"), 100, null));
-        var balanced = recipes.stream().filter(r -> r.name().contains("Balanced")).findFirst().orElseThrow();
+        var balanced = getBalanced(recipes);
         assertThat(balanced.ingredients()).containsKey("Ilmenite (granular)");
         assertThat(balanced.ingredients()).containsKey("Manganese Granules");
     }
@@ -281,7 +296,7 @@ class GlazeRecipeServiceTest {
     void crystallineEffectAddsZincOxide() {
         var recipes = service.generateRecipes(
                 request("#ffffff", 1220, "Glossy", "Medium", List.of("Crystalline"), 100, null));
-        var balanced = recipes.stream().filter(r -> r.name().contains("Balanced")).findFirst().orElseThrow();
+        var balanced = getBalanced(recipes);
         assertThat(balanced.ingredients()).containsKey("Zinc Oxide");
         assertThat(balanced.ingredients()).containsKey("Titanium Dioxide");
     }
@@ -290,7 +305,7 @@ class GlazeRecipeServiceTest {
     void flameEffectAddsIronChromate() {
         var recipes = service.generateRecipes(
                 request("#ffffff", 1220, "Satin", "Medium", List.of("Flame"), 100, null));
-        var balanced = recipes.stream().filter(r -> r.name().contains("Balanced")).findFirst().orElseThrow();
+        var balanced = getBalanced(recipes);
         assertThat(balanced.ingredients()).containsKey("Iron Chromate");
         assertThat(balanced.ingredients()).containsKey("Titanium Dioxide");
     }
@@ -299,7 +314,7 @@ class GlazeRecipeServiceTest {
     void fluidStabilityAddsLithiumCarbonate() {
         var recipes = service.generateRecipes(
                 request("#ffffff", 1220, "Glossy", "Low", List.of(), 50, null));
-        var balanced = recipes.stream().filter(r -> r.name().contains("Balanced")).findFirst().orElseThrow();
+        var balanced = getBalanced(recipes);
         assertThat(balanced.ingredients()).containsKey("Lithium Carbonate");
         assertThat(balanced.ingredients()).containsKey("Wollastonite");
     }
@@ -392,7 +407,7 @@ class GlazeRecipeServiceTest {
     void zeroIntensityProducesNoEffectAgents() {
         var req = request("#ffffff", 1220, "Satin", "Medium", List.of("Speckled"), 0, null);
         var recipes = service.generateRecipes(req);
-        var balanced = recipes.stream().filter(r -> r.name().contains("Balanced")).findFirst().orElseThrow();
+        var balanced = getBalanced(recipes);
         assertThat(balanced.ingredients()).doesNotContainKey("Ilmenite (granular)");
         assertThat(balanced.ingredients()).doesNotContainKey("Manganese Granules");
     }
@@ -405,8 +420,8 @@ class GlazeRecipeServiceTest {
         var lowRecipes  = service.generateRecipes(lowReq);
         var highRecipes = service.generateRecipes(highReq);
 
-        double lowIlmenite = extractIngredient(lowRecipes, "Balanced", "Ilmenite (granular)");
-        double highIlmenite = extractIngredient(highRecipes, "Balanced", "Ilmenite (granular)");
+        double lowIlmenite = getBalanced(lowRecipes).ingredients().getOrDefault("Ilmenite (granular)", 0.0);
+        double highIlmenite = getBalanced(highRecipes).ingredients().getOrDefault("Ilmenite (granular)", 0.0);
 
         assertThat(highIlmenite).isGreaterThan(lowIlmenite);
     }
@@ -435,7 +450,7 @@ class GlazeRecipeServiceTest {
 
         var recipesWith    = service.generateRecipes(withSecondary);
 
-        double cobaltWith    = extractIngredient(recipesWith, "Balanced", "Cobalt Carbonate");
+        double cobaltWith    = getBalanced(recipesWith).ingredients().getOrDefault("Cobalt Carbonate", 0.0);
 
         // Secondary red adds Red Iron Oxide; primary blue adds Cobalt Carbonate.
         // With secondary the formula is different — secondary colorant should appear.
@@ -528,15 +543,8 @@ class GlazeRecipeServiceTest {
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
+    /** The first recipe is always the primary colourant route on the standard base. */
     private static RecipeSuggestion getBalanced(List<RecipeSuggestion> recipes) {
-        return recipes.stream().filter(r -> r.name().contains("Balanced")).findFirst().orElseThrow();
-    }
-
-    private static double extractIngredient(List<RecipeSuggestion> recipes, String variantHint, String ingredient) {
-        return recipes.stream()
-                .filter(r -> r.name().contains(variantHint))
-                .findFirst()
-                .map(r -> r.ingredients().getOrDefault(ingredient, 0.0))
-                .orElse(0.0);
+        return recipes.get(0);
     }
 }

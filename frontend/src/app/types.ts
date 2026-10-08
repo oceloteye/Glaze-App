@@ -50,6 +50,12 @@ export type Umf = {
   r2oShare: number
 }
 
+export type RecipeRoute = {
+  name: string
+  summary: string
+  signature: string[]
+}
+
 export type RecipeSuggestion = {
   name: string
   firingRange: string
@@ -57,6 +63,7 @@ export type RecipeSuggestion = {
   rationale: string
   umf: Umf
   firingSchedules: FiringSchedule[]
+  route?: RecipeRoute
 }
 
 export type GenerateRecipesResponse = {

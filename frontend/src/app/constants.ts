@@ -73,11 +73,16 @@ export const COLORANT_INGREDIENTS = new Set<string>([
   'Yellow Iron Oxide',
   'Iron Oxide',
   'Cobalt Carbonate',
+  'Cobalt Oxide',
   'Copper Carbonate',
+  'Copper Oxide',
+  'Chrome Oxide',
+  'Nickel Oxide',
   'Manganese Dioxide',
   'Manganese Granules',
   'Rutile',
   'Titanium Dioxide',
+  'Ilmenite',
   'Ilmenite (granular)',
   'Iron Chromate',
   'Zircopax',
@@ -219,5 +224,53 @@ export const INGREDIENT_INFO: Record<string, IngredientInfo> = {
   'Iron Oxide': {
     role: 'Colorant',
     description: 'Iron in general. Warm browns and ambers in oxidation, greens and blacks in reduction; increases fluidity of the melt.',
+  },
+  'Chrome Oxide': {
+    role: 'Colorant',
+    description: 'A refractory, very stable green: 0.5–2% gives muted leaf greens in a zinc-free base. Turns pink with tin, brown with zinc, and can volatilise onto neighbouring pots.',
+  },
+  'Nickel Oxide': {
+    role: 'Colorant',
+    description: 'Greys and soft greens in most bases; lavender-blue with high zinc and soft pinks with barium or magnesia. Weak and unpredictable, so usually 1–3%.',
+  },
+  'Cobalt Oxide': {
+    role: 'Colorant',
+    description: 'Cobalt in its strongest form, roughly 1.5× the colouring power of the carbonate. Coarser, so it can speckle unless well sieved.',
+  },
+  'Copper Oxide': {
+    role: 'Colorant',
+    description: 'Black copper oxide, about 1.5× as strong as the carbonate. Same greens, turquoises and reduction reds; coarser particles can leave specks.',
+  },
+  'Barium Carbonate': {
+    role: 'Alkaline-earth flux (toxic)',
+    description: 'Gives silky mattes and vivid blue-greens with copper at cone 6 and above. Toxic raw and can leach from under-fired glazes — not for food surfaces.',
+  },
+  'Strontium Carbonate': {
+    role: 'Alkaline-earth flux',
+    description: 'A safer substitute for barium that produces similar satin-matte surfaces, though copper colours are less vivid.',
+  },
+  'Bone Ash': {
+    role: 'Phosphorus source',
+    description: 'Calcium phosphate. Phosphorus scatters light in the glass, producing the milky blue-white opalescence of chun glazes and helping iron reds crystallise.',
+  },
+  'Gerstley Borate': {
+    role: 'Boron flux',
+    description: 'A raw boron-calcium mineral that melts early and gives fluid, glossy glazes. Variable and partly soluble; key to many iron reds and floating blues.',
+  },
+  Spodumene: {
+    role: 'Lithium feldspar',
+    description: 'Lithium-alumina-silicate that lowers expansion and brightens alkaline colours. The lithium flux in many shinos and crawl glazes.',
+  },
+  'Custer Feldspar': {
+    role: 'Primary flux / glass former',
+    description: 'A common North American potash feldspar; interchangeable with generic potash feldspar in most recipes.',
+  },
+  'Ball Clay': {
+    role: 'Alumina source / suspension',
+    description: 'Fine, plastic secondary clay. Supplies alumina like kaolin but with more iron and better suspension; too much can cause crawling.',
+  },
+  Ilmenite: {
+    role: 'Speckle agent',
+    description: 'Iron-titanium ore. Powdered, it gives tan and brown tones with some variegation; granular, it produces dark specks.',
   },
 }
