@@ -919,6 +919,50 @@ function drawGlaze(
   ctx.restore()
 }
 
+export type GlazePreviewRenderOptions = Pick<
+  Props,
+  | 'color'
+  | 'surfaceFinish'
+  | 'effect'
+  | 'secondaryColor'
+  | 'intensity'
+  | 'recipeIngredients'
+  | 'firingTempC'
+  | 'stability'
+  | 'opacity'
+  | 'foodSafe'
+  | 'atmosphere'
+>
+
+/** Renders the same preview as the component onto an offscreen canvas and returns it as a PNG data URL. */
+// eslint-disable-next-line react-refresh/only-export-components -- shares the private drawGlaze renderer with the print sheet
+export function renderGlazePreviewDataUrl(options: GlazePreviewRenderOptions, size = PREVIEW_SIZE * 2): string | null {
+  const canvas = document.createElement('canvas')
+  canvas.width = size
+  canvas.height = size
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return null
+  const scale = size / PREVIEW_SIZE
+  ctx.setTransform(scale, 0, 0, scale, 0, 0)
+  drawGlaze(
+    ctx,
+    PREVIEW_SIZE,
+    PREVIEW_SIZE,
+    options.color,
+    options.surfaceFinish,
+    options.effect,
+    options.secondaryColor,
+    options.intensity,
+    options.recipeIngredients,
+    options.firingTempC,
+    options.stability,
+    options.opacity,
+    options.foodSafe,
+    options.atmosphere?.toLowerCase() === 'reduction',
+  )
+  return canvas.toDataURL('image/png')
+}
+
 export function GlazePreview({
   color,
   surfaceFinish,

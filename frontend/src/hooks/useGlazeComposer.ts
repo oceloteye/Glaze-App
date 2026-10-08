@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { buildFiringScheduleExport, firingScheduleFileStem, firingScheduleToCsv } from '../lib/firingScheduleExport'
 import { CONES, EFFECTS_WITH_SECONDARY } from '../app/constants'
+import { renderGlazePreviewDataUrl } from '../GlazePreview'
 import type {
   GenerateRecipesResponse,
   GlazeRequest,
@@ -130,9 +131,25 @@ export function useGlazeComposer() {
     }
   }
 
-  const handlePrint = () => {
+  const handlePrint = (options: { includePreview?: boolean } = {}) => {
     setError(null)
     const payload = buildExportPayload()
+    const previewFor = (recipe: RecipeSuggestion) =>
+      options.includePreview
+        ? renderGlazePreviewDataUrl({
+            color: form.color,
+            surfaceFinish: form.surfaceFinish,
+            effect: form.effects[0] ?? '',
+            secondaryColor: showSecondaryColor ? secondaryColor : undefined,
+            intensity: effectIntensity,
+            recipeIngredients: recipe.ingredients,
+            firingTempC: form.firingTempC,
+            stability: form.stability,
+            opacity: form.opacity,
+            foodSafe: form.foodSafe ?? false,
+            atmosphere: form.atmosphere,
+          })
+        : null
 
     const paramsEntries = Object.entries(payload.parameters)
       .filter(([, value]) => value !== undefined)
@@ -204,10 +221,16 @@ export function useGlazeComposer() {
           `
           : ''
 
+        const previewUrl = previewFor(recipe)
+        const previewHtml = previewUrl
+          ? `<figure class="preview"><img src="${previewUrl}" alt="Predicted appearance of ${escapeHtml(recipe.name)}" /><figcaption>Predicted appearance — ${escapeHtml(form.color.toUpperCase())}</figcaption></figure>`
+          : ''
+
         return `
           <section class="recipe">
             <h3>${escapeHtml(recipe.name)}</h3>
             <p class="range">${escapeHtml(recipe.firingRange)}</p>
+            ${previewHtml}
             <p>${escapeHtml(recipe.rationale)}</p>
             <table>
               <thead><tr><th>Ingredient</th><th>Percent</th></tr></thead>
@@ -242,6 +265,11 @@ export function useGlazeComposer() {
           tr.group th { background: #ece2d6; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: #5f4b3f; }
           .recipe { border-top: 2px solid #e1d4c7; margin-top: 18px; padding-top: 14px; break-inside: avoid; }
           .range { color: #5f4b3f; font-style: italic; }
+          .preview { float: right; margin: 0 0 12px 16px; text-align: center; }
+          .preview img { display: block; width: 180px; height: 180px; border-radius: 12px; }
+          .preview figcaption { font-size: 12px; color: #5f4b3f; margin-top: 4px; }
+          .recipe table { clear: both; }
+          @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
         </style>
       </head>
       <body>
@@ -290,11 +318,15 @@ export function useGlazeComposer() {
     }
 
     iframeWin.onafterprint = cleanup
-    window.setTimeout(() => {
-      iframeWin.focus()
-      iframeWin.print()
-      cleanup()
-    }, 150)
+    const images = Array.from(iframeDoc.images)
+    const imagesReady = Promise.all(images.map((img) => img.decode().catch(() => undefined)))
+    imagesReady.then(() => {
+      window.setTimeout(() => {
+        iframeWin.focus()
+        iframeWin.print()
+        cleanup()
+      }, 150)
+    })
   }
 
   return {
