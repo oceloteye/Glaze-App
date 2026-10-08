@@ -498,6 +498,20 @@
   gap: 0.5rem;
   margin: 0.2rem 0 0.8rem;
   flex-wrap: wrap;
+  align-items: center;
+}
+
+.print-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.84rem;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.print-option input {
+  margin: 0;
 }
 
 .ghost-btn {

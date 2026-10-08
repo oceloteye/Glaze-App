@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { GlazeComposer } from '../hooks/useGlazeComposer'
 import type { FiringSchedule, RecipeSuggestion, ScheduleLength } from '../app/types'
 import { INGREDIENT_INFO } from '../app/constants'
@@ -141,6 +142,7 @@ export function RecipeResultsPanel({ composer }: Props) {
     setScheduleLength,
     scheduleFor,
   } = composer
+  const [printPreview, setPrintPreview] = useState(false)
 
   return (
     <section className="panel results-panel">
@@ -150,9 +152,17 @@ export function RecipeResultsPanel({ composer }: Props) {
       ) : (
         <>
           <div className="results-actions">
-            <button type="button" className="ghost-btn" onClick={handlePrint}>
+            <button type="button" className="ghost-btn" onClick={() => handlePrint({ includePreview: printPreview })}>
               Print Recipe Sheet
             </button>
+            <label className="print-option">
+              <input
+                type="checkbox"
+                checked={printPreview}
+                onChange={(event) => setPrintPreview(event.target.checked)}
+              />
+              Include preview image
+            </label>
             <button type="button" className="ghost-btn" onClick={handleExportJson}>
               Export JSON
             </button>
