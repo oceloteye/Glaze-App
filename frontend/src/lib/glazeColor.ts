@@ -5,7 +5,7 @@ type Rgb = [number, number, number]
 const BASE_CLEAR: Rgb = [226, 215, 198]
 // reduction greys the body and the glass, so even a clear reads cooler
 const BASE_CLEAR_REDUCTION: Rgb = [214, 216, 206]
-const WHITE: Rgb = [244, 241, 234]
+const WHITE: Rgb = [248, 247, 244]
 const BLACK: Rgb = [24, 20, 22]
 
 function hex(rgb: Rgb) {
@@ -38,21 +38,23 @@ function ironEquivalent(recipe: Record<string, number>) {
 }
 
 /**
- * 0–1: how strongly an oxidation iron-saturate will recrystallise to rust red on cooling.
- * Needs lots of iron (>= ~8%), a fluid boron melt, and magnesia/phosphate to seed the crystals.
+ * 0–1: how strongly an iron-saturate will recrystallise to rust red on cooling.
+ * Needs lots of iron and magnesia/phosphate to seed the crystals; in oxidation it also needs a fluid boron melt,
+ * in reduction (kaki) the saturated high-fire melt re-oxidises on its own.
  */
 export function ironRedStrength(recipe: Record<string, number>, reduction: boolean) {
-  if (reduction) return 0
   const iron = ironEquivalent(recipe)
+  const seed = clamp01((pct(recipe, ['Talc', 'Bone Ash', 'Dolomite']) - 5) / 8)
+  if (reduction) return clamp01((iron - 9) / 3) * seed
   const boron = pct(recipe, ['Gerstley Borate', 'Ferro Frit 3134', 'Ferro Frit 3124'])
-  const crystalHelpers = pct(recipe, ['Talc', 'Bone Ash', 'Dolomite'])
-  return clamp01((iron - 8) / 4) * clamp01((boron - 10) / 15) * clamp01((crystalHelpers - 5) / 8)
+  return clamp01((iron - 8) / 4) * clamp01((boron - 10) / 15) * seed
 }
 
 export function predictGlazeColor(recipe: Record<string, number>, reduction: boolean): string {
   let color = reduction ? BASE_CLEAR_REDUCTION : BASE_CLEAR
 
-  const opacifier = pct(recipe, ['Zircopax', 'Tin Oxide', 'Titanium Dioxide'])
+  // tin opacifies at roughly half the dose zircon needs
+  const opacifier = pct(recipe, ['Zircopax', 'Titanium Dioxide']) + (recipe['Tin Oxide'] ?? 0) * 1.6
   color = lerp(color, WHITE, strength(opacifier, 6))
 
   const iron = ironEquivalent(recipe)
@@ -65,6 +67,16 @@ export function predictGlazeColor(recipe: Record<string, number>, reduction: boo
     color = lerp(color, target, strength(iron, reduction ? 3 : 3.5))
   }
 
+  if (reduction) {
+    // chun: phosphorus in a reduction clear scatters blue; swamped by more than a trace of iron
+    const boneAsh = recipe['Bone Ash'] ?? 0
+    if (boneAsh > 1.5) color = lerp(color, [140, 170, 200], strength(boneAsh, 4) * clamp01((3 - iron) / 2))
+    // shino: a calcium-free, clay-rich alkaline glaze flashes orange from the body's iron where thin
+    const clay = pct(recipe, ['EPK Kaolin', 'Ball Clay'])
+    const calcium = pct(recipe, ['Whiting', 'Wollastonite', 'Dolomite'])
+    if (calcium < 3 && clay > 15) color = lerp(color, [222, 170, 120], clamp01((clay - 15) / 10) * 0.6)
+  }
+
   const rutile = recipe['Rutile'] ?? 0
   if (rutile > 0) color = lerp(color, [196, 160, 112], strength(rutile, 5))
 
@@ -72,7 +84,11 @@ export function predictGlazeColor(recipe: Record<string, number>, reduction: boo
   if (manganese > 0) color = lerp(color, [104, 52, 74], strength(manganese, 2.5))
 
   const nickel = recipe['Nickel Oxide'] ?? 0
-  if (nickel > 0) color = lerp(color, [118, 124, 100], strength(nickel, 1.5))
+  if (nickel > 0) {
+    // nickel is blue in zinc glazes, grey-green elsewhere
+    const zincBlue = clamp01(((recipe['Zinc Oxide'] ?? 0) - 3) / 5)
+    color = lerp(color, lerp([108, 124, 92], [96, 112, 170], zincBlue), strength(nickel, 0.8))
+  }
 
   const chrome = (recipe['Chrome Oxide'] ?? 0) + (recipe['Iron Chromate'] ?? 0) * 0.7
   if (chrome > 0) {
@@ -86,9 +102,15 @@ export function predictGlazeColor(recipe: Record<string, number>, reduction: boo
   const copper = (recipe['Copper Carbonate'] ?? 0) * 0.72 + (recipe['Copper Oxide'] ?? 0)
   if (copper > 0) {
     const alkaline = pct(recipe, ['Nepheline Syenite', 'Soda Feldspar', 'Lithium Carbonate', 'Barium Carbonate']) > 25
-    // copper red needs only a fraction of a percent; oxidation greens need a few percent
-    if (reduction) color = lerp(color, [138, 24, 36], strength(copper, 0.22))
-    else color = lerp(color, alkaline ? [72, 170, 165] : [62, 134, 78], strength(copper, 1.3))
+    const green: Rgb = alkaline ? [72, 170, 165] : [62, 134, 78]
+    if (reduction) {
+      // copper red only forms from a trace; a few percent stays green (oribe) even in reduction
+      const red = clamp01((1.6 - copper) / 0.8)
+      color = lerp(color, [138, 24, 36], strength(copper, 0.22) * red)
+      color = lerp(color, green, strength(copper, 1.3) * (1 - red))
+    } else {
+      color = lerp(color, green, strength(copper, 1.3))
+    }
   }
 
   const cobalt = (recipe['Cobalt Carbonate'] ?? 0) * 0.63 + (recipe['Cobalt Oxide'] ?? 0) * 0.93
