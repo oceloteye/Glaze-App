@@ -33,7 +33,7 @@ function describeMiss(hsl: { h: number; s: number; l: number }, band: ColorBand)
 
 describe('predictGlazeColor against published reference glazes', () => {
   it.each(REFERENCE_GLAZES.map((ref) => [ref.name, ref] as const))('%s', (_name, ref) => {
-    const hex = predictGlazeColor(toPercentages(ref.recipe), ref.reduction)
+    const hex = predictGlazeColor(toPercentages(ref.recipe), ref.reduction, ref.tempC)
     const hsl = hexToHsl(hex)
     const misses = describeMiss(hsl, ref.expect)
     expect(misses, `${ref.name} → ${hex} (expected ${ref.looksLike})`).toEqual([])
@@ -42,7 +42,7 @@ describe('predictGlazeColor against published reference glazes', () => {
   // PRINT_COLORS=1 npx vitest run  →  dumps the predicted swatch table for eyeballing
   it.runIf(import.meta.env.PRINT_COLORS)('prints the predicted swatch table', () => {
     const rows = REFERENCE_GLAZES.map((ref) => {
-      const hex = predictGlazeColor(toPercentages(ref.recipe), ref.reduction)
+      const hex = predictGlazeColor(toPercentages(ref.recipe), ref.reduction, ref.tempC)
       const { h, s, l } = hexToHsl(hex)
       return `${hex}  h${h.toFixed(0).padStart(3)} s${s.toFixed(2)} l${l.toFixed(2)}  ${ref.name.padEnd(42)} ${ref.looksLike}`
     })

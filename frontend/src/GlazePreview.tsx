@@ -358,7 +358,7 @@ function drawGlaze(
   ctx.clearRect(0, 0, w, h)
 
   const chemistry = deriveChemistry(recipeIngredients, firingTempC, stability, opacityTarget, foodSafe)
-  const ironRed = recipeIngredients ? ironRedStrength(recipeIngredients, reduction) : 0
+  const ironRed = recipeIngredients ? ironRedStrength(recipeIngredients, reduction, firingTempC) : 0
   const melt = chemistry.melt
   // a fluid dab slumps and runs, so it is set smaller and higher to leave room for the tongues
   const cx = w / 2
