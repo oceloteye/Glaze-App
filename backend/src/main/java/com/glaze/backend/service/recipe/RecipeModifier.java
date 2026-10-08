@@ -316,15 +316,8 @@ public final class RecipeModifier {
             RecipeMath.adjust(formula, ZIRCOPAX, 9.0 * weight);
             return;
         }
-        if (s < 0.12) {
-            // neutral grey / khaki: nickel, darkened with a little iron and manganese
-            RecipeMath.adjust(formula, NICKEL_OXIDE, 1.2 * weight * (1.0 - l));
-            RecipeMath.adjust(formula, RED_IRON_OXIDE, 2.5 * weight * darkFactor);
-            RecipeMath.adjust(formula, MANGANESE_DIOXIDE, 0.8 * weight * darkFactor);
-            return;
-        }
         boolean ironSaturate = warm && s >= 0.15 && s < 0.45 && l < 0.26;
-        if (l < 0.18 || ironSaturate) {
+        if (l < 0.2 || ironSaturate) {
             if (warm && s >= 0.15) {
                 // tenmoku: ~10% iron once normalised; below that the melt sits at yellow-brown
                 RecipeMath.adjust(formula, RED_IRON_OXIDE, 11.0 * weight);
@@ -336,16 +329,29 @@ public final class RecipeModifier {
             }
             return;
         }
+        if (s < 0.12) {
+            // neutral grey / khaki: nickel, darkened with a little iron and manganese
+            RecipeMath.adjust(formula, NICKEL_OXIDE, 1.2 * weight * (1.0 - l));
+            RecipeMath.adjust(formula, RED_IRON_OXIDE, 2.5 * weight * darkFactor);
+            RecipeMath.adjust(formula, MANGANESE_DIOXIDE, 0.8 * weight * darkFactor);
+            return;
+        }
         if (reduction && h >= 80 && h < 200 && s < 0.32 && l >= 0.45) {
             // celadon family: iron alone, blue-grey at a trace and olive as it builds
             double dose = h < 120 ? 2.0 + 4.5 * (1.0 - l) : 0.6 + 2.2 * (1.0 - l);
             RecipeMath.adjust(formula, RED_IRON_OXIDE, dose * weight);
             return;
         }
-        if (reduction && h >= 195 && h < 225 && s < 0.35 && l >= 0.6) {
+        if (reduction && h >= 195 && h < 215 && s < 0.35 && l >= 0.6) {
             // chun: phosphate opalescence over a trace of iron
             RecipeMath.adjust(formula, BONE_ASH, 4.0 * weight);
             RecipeMath.adjust(formula, RED_IRON_OXIDE, 1.0 * weight);
+            return;
+        }
+        if (h >= 205 && h < 260 && s < 0.35 && l >= 0.6) {
+            // pale blue: a trace of cobalt is all a clear needs; whiten only the very palest
+            RecipeMath.adjust(formula, COBALT_CARBONATE, 0.45 * weight * RecipeMath.clamp01((0.85 - l) / 0.25) * (0.5 + s));
+            RecipeMath.adjust(formula, ZIRCOPAX, 3.0 * weight * RecipeMath.clamp01((l - 0.7) / 0.15));
             return;
         }
         if ((h >= 330 || h < 15) && l >= 0.6 && s >= 0.3 && s <= 0.6) {
@@ -354,9 +360,10 @@ public final class RecipeModifier {
             RecipeMath.adjust(formula, CHROME_OXIDE, 0.25 * weight);
             return;
         }
-        if (h >= 300 && s < 0.4 && l >= 0.3) {
-            // manganese plum
+        if (h >= 255 && s < 0.4 && l >= 0.3) {
+            // manganese plum, pushed toward violet by a cobalt trace as the ask gets bluer
             RecipeMath.adjust(formula, MANGANESE_DIOXIDE, 4.0 * weight * chromaFactor + 2.5 * weight * darkFactor);
+            RecipeMath.adjust(formula, COBALT_CARBONATE, 0.35 * weight * RecipeMath.clamp01((300.0 - h) / 40.0));
             RecipeMath.adjust(formula, RED_IRON_OXIDE, 0.5 * weight);
             return;
         }
@@ -372,12 +379,12 @@ public final class RecipeModifier {
             RecipeMath.adjust(formula, YELLOW_IRON_OXIDE, 2.0 * weight * chromaFactor);
         } else if (h < 180) {
             if (h < 105) {
-                RecipeMath.adjust(formula, COPPER_CARBONATE, 2.8 * weight * chromaFactor);
+                RecipeMath.adjust(formula, COPPER_CARBONATE, 2.8 * weight * chromaFactor * depth);
                 RecipeMath.adjust(formula, YELLOW_IRON_OXIDE, 1.4 * weight * (0.6 + 0.8 * s));
                 RecipeMath.adjust(formula, RUTILE, 0.9 * weight * (0.6 + darkFactor));
                 RecipeMath.adjust(formula, RED_IRON_OXIDE, 0.8 * weight * darkFactor);
             } else if (h < 150) {
-                RecipeMath.adjust(formula, COPPER_CARBONATE, 3.6 * weight * chromaFactor);
+                RecipeMath.adjust(formula, COPPER_CARBONATE, 3.6 * weight * chromaFactor * depth);
                 RecipeMath.adjust(formula, YELLOW_IRON_OXIDE, 0.5 * weight * (0.5 + 0.8 * s));
                 RecipeMath.adjust(formula, RED_IRON_OXIDE, 0.5 * weight * darkFactor);
             } else {
