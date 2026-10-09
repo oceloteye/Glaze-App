@@ -45,7 +45,7 @@ export function GlazeParameterForm({ composer }: Props) {
         foodSafe={form.foodSafe ?? false}
         coneLabel={CONES[coneIndex].name}
         atmosphere={form.atmosphere}
-        caption="Colour goal — what you asked for, not a recipe prediction"
+        caption="Color Reference"
       />
 
       <label>
