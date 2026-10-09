@@ -100,6 +100,7 @@ export function RecipeBuilderForm({ builder }: Props) {
     setParts,
     clearRecipe,
     loadStarter,
+    loadedRecipeName,
   } = builder
 
   const [pendingMaterial, setPendingMaterial] = useState('')
@@ -124,6 +125,11 @@ export function RecipeBuilderForm({ builder }: Props) {
           </button>
         </div>
       </div>
+      {loadedRecipeName ? (
+        <p className="builder-loaded">
+          Loaded from the generator: <strong>{loadedRecipeName}</strong>
+        </p>
+      ) : null}
 
       <div className="builder-firing">
         <label className="builder-firing__cone">

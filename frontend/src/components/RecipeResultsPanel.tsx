@@ -1,8 +1,10 @@
 import { useState } from 'react'
+import { Link } from 'react-router'
 import type { GlazeComposer } from '../hooks/useGlazeComposer'
 import type { FiringSchedule, RecipeSuggestion, ScheduleLength } from '../app/types'
 import { INGREDIENT_INFO } from '../app/constants'
 import { splitIngredients, sumPercent, type IngredientEntry } from '../app/utils'
+import { builderHref } from '../lib/builderHandoff'
 import { UmfSection } from './UmfSection'
 
 interface Props {
@@ -134,6 +136,7 @@ function FiringScheduleSection({
 
 export function RecipeResultsPanel({ composer }: Props) {
   const {
+    form,
     recipes,
     handlePrint,
     handleExportJson,
@@ -211,6 +214,15 @@ export function RecipeResultsPanel({ composer }: Props) {
                     onExport={handleExportFiringSchedule}
                   />
                 )}
+                <div className="recipe-card__actions">
+                  <Link
+                    className="ghost-btn ghost-btn--small"
+                    to={builderHref(recipe, { firingTempC: form.firingTempC, atmosphere: form.atmosphere })}
+                    title="Open this recipe in the Recipe Builder to adjust it material by material (Ctrl/Cmd-click for a new tab)"
+                  >
+                    Open in Recipe Builder
+                  </Link>
+                </div>
               </article>
               )
             })}

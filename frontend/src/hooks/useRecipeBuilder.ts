@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router'
 import { CONES } from '../app/constants'
 import type { AnalyzeResponse, MaterialInfo } from '../app/types'
 import { nearestConeIndex } from '../app/utils'
+import { parseBuilderHandoff } from '../lib/builderHandoff'
 import { predictGlazeColor } from '../lib/glazeColor'
 
 export type BuilderRow = { name: string; parts: number }
@@ -16,14 +18,22 @@ export const STARTER_RECIPE: BuilderRow[] = [
 const ANALYZE_DEBOUNCE_MS = 200
 
 export function useRecipeBuilder() {
+  const [searchParams, setSearchParams] = useSearchParams()
+  // Lazy initialisers so a handed-off recipe is in place on the first render.
+  const [handoff] = useState(() => parseBuilderHandoff(searchParams))
   const [materials, setMaterials] = useState<MaterialInfo[]>([])
   const [materialsError, setMaterialsError] = useState<string | null>(null)
-  const [rows, setRows] = useState<BuilderRow[]>(STARTER_RECIPE)
-  const [firingTempC, setFiringTempC] = useState(1222)
-  const [atmosphere, setAtmosphere] = useState<'Oxidation' | 'Reduction'>('Oxidation')
+  const [rows, setRows] = useState<BuilderRow[]>(() => handoff?.rows ?? STARTER_RECIPE)
+  const [firingTempC, setFiringTempC] = useState(() => handoff?.firingTempC ?? 1222)
+  const [atmosphere, setAtmosphere] = useState<'Oxidation' | 'Reduction'>(() => handoff?.atmosphere ?? 'Oxidation')
+  const [loadedRecipeName, setLoadedRecipeName] = useState<string | null>(() => handoff?.name ?? null)
   const [analysis, setAnalysis] = useState<AnalyzeResponse | null>(null)
   const [analyzing, setAnalyzing] = useState(false)
   const [analysisError, setAnalysisError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (handoff) setSearchParams({}, { replace: true })
+  }, [handoff, setSearchParams])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -114,9 +124,13 @@ export function useRecipeBuilder() {
   const clearRecipe = useCallback(() => {
     setRows([])
     setAnalysis(null)
+    setLoadedRecipeName(null)
   }, [])
 
-  const loadStarter = useCallback(() => setRows(STARTER_RECIPE), [])
+  const loadStarter = useCallback(() => {
+    setRows(STARTER_RECIPE)
+    setLoadedRecipeName(null)
+  }, [])
 
   const availableMaterials = useMemo(
     () => materials.filter((m) => !rows.some((row) => row.name === m.name)),
@@ -140,6 +154,7 @@ export function useRecipeBuilder() {
     analyzing,
     analysisError,
     previewColor,
+    loadedRecipeName,
     addMaterial,
     removeMaterial,
     setParts,
