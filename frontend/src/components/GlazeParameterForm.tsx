@@ -12,7 +12,6 @@ export function GlazeParameterForm({ composer }: Props) {
     form,
     loading,
     error,
-    selectedRecipe,
     handleSubmit,
     currentEffect,
     showSecondaryColor,
@@ -40,14 +39,13 @@ export function GlazeParameterForm({ composer }: Props) {
         effect={form.effects[0] ?? ''}
         secondaryColor={showSecondaryColor ? secondaryColor : undefined}
         intensity={effectIntensity}
-        recipeIngredients={selectedRecipe?.ingredients}
-        selectedRecipeName={selectedRecipe?.name}
         firingTempC={form.firingTempC}
         stability={form.stability}
         opacity={form.opacity}
         foodSafe={form.foodSafe ?? false}
         coneLabel={CONES[coneIndex].name}
         atmosphere={form.atmosphere}
+        caption="Colour goal — what you asked for, not a recipe prediction"
       />
 
       <label>

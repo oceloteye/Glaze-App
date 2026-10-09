@@ -8,14 +8,13 @@ interface Props {
   secondaryColor?: string
   intensity?: number
   recipeIngredients?: Record<string, number>
-  selectedRecipeName?: string
   firingTempC?: number
   stability?: string
   opacity?: string
   foodSafe?: boolean
   coneLabel?: string
   atmosphere?: string
-  /** Overrides the default "Calibrated to top recipe" / "Estimate from inputs" caption. */
+  /** Overrides the default "Estimate from inputs" caption. */
   caption?: string
 }
 
@@ -970,7 +969,6 @@ export function GlazePreview({
   secondaryColor,
   intensity = 50,
   recipeIngredients,
-  selectedRecipeName,
   firingTempC,
   stability,
   opacity,
@@ -1038,12 +1036,7 @@ export function GlazePreview({
           </span>
         ))}
       </div>
-      <p className="glaze-preview-caption">
-        {caption ?? (recipeIngredients ? 'Calibrated to top recipe' : 'Estimate from inputs')}
-      </p>
-      {selectedRecipeName ? (
-        <p className="glaze-preview-selected">{selectedRecipeName}</p>
-      ) : null}
+      <p className="glaze-preview-caption">{caption ?? 'Estimate from inputs'}</p>
     </div>
   )
 }
