@@ -3,6 +3,7 @@ import type { FormEvent } from 'react'
 import { buildFiringScheduleExport, firingScheduleFileStem, firingScheduleToCsv } from '../lib/firingScheduleExport'
 import { CONES, EFFECTS_WITH_SECONDARY } from '../app/constants'
 import { renderGlazePreviewDataUrl } from '../GlazePreview'
+import { useSessionState } from './useSessionState'
 import type {
   GenerateRecipesResponse,
   GlazeRequest,
@@ -35,17 +36,27 @@ const DEFAULT_FORM: GlazeRequest = {
   foodSafe: true,
 }
 
+const KEY = 'glaze-lab:generator:'
+
 export function useGlazeComposer() {
-  const [form, setForm] = useState<GlazeRequest>(DEFAULT_FORM)
+  const [form, setForm] = useSessionState<GlazeRequest>(`${KEY}form`, (stored) => ({ ...DEFAULT_FORM, ...stored }))
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [recipes, setRecipes] = useState<RecipeSuggestion[]>([])
-  const [tempUnit, setTempUnit] = useState<TempUnit>('C')
-  const [tempInputStr, setTempInputStr] = useState('1222')
-  const [secondaryColor, setSecondaryColor] = useState('#808080')
-  const [secondaryHexInput, setSecondaryHexInput] = useState('#808080')
-  const [effectIntensity, setEffectIntensity] = useState(50)
-  const [scheduleLength, setScheduleLength] = useState<ScheduleLength>('medium')
+  const [recipes, setRecipes] = useSessionState<RecipeSuggestion[]>(`${KEY}recipes`, (stored) =>
+    Array.isArray(stored) ? stored : [],
+  )
+  const [tempUnit, setTempUnit] = useSessionState<TempUnit>(`${KEY}tempUnit`, (stored) => stored ?? 'C')
+  const [tempInputStr, setTempInputStr] = useSessionState<string>(`${KEY}tempInput`, (stored) => stored ?? '1222')
+  const [secondaryColor, setSecondaryColor] = useSessionState<string>(`${KEY}secondary`, (stored) => stored ?? '#808080')
+  const [secondaryHexInput, setSecondaryHexInput] = useSessionState<string>(
+    `${KEY}secondaryInput`,
+    (stored) => stored ?? '#808080',
+  )
+  const [effectIntensity, setEffectIntensity] = useSessionState<number>(`${KEY}intensity`, (stored) => stored ?? 50)
+  const [scheduleLength, setScheduleLength] = useSessionState<ScheduleLength>(
+    `${KEY}scheduleLength`,
+    (stored) => stored ?? 'medium',
+  )
 
   const currentEffect = form.effects[0] ?? ''
   const showSecondaryColor = EFFECTS_WITH_SECONDARY.has(currentEffect)

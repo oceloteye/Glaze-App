@@ -5,6 +5,7 @@ import type { AnalyzeResponse, MaterialInfo } from '../app/types'
 import { nearestConeIndex } from '../app/utils'
 import { parseBuilderHandoff } from '../lib/builderHandoff'
 import { predictGlazeColor } from '../lib/glazeColor'
+import { useSessionState } from './useSessionState'
 
 export type BuilderRow = { name: string; parts: number }
 
@@ -16,17 +17,30 @@ export const STARTER_RECIPE: BuilderRow[] = [
 ]
 
 const ANALYZE_DEBOUNCE_MS = 200
+const KEY = 'glaze-lab:builder:'
 
 export function useRecipeBuilder() {
   const [searchParams, setSearchParams] = useSearchParams()
-  // Lazy initialisers so a handed-off recipe is in place on the first render.
+  // Lazy initialisers so a handed-off recipe is in place on the first render; the handoff beats stored state.
   const [handoff] = useState(() => parseBuilderHandoff(searchParams))
   const [materials, setMaterials] = useState<MaterialInfo[]>([])
   const [materialsError, setMaterialsError] = useState<string | null>(null)
-  const [rows, setRows] = useState<BuilderRow[]>(() => handoff?.rows ?? STARTER_RECIPE)
-  const [firingTempC, setFiringTempC] = useState(() => handoff?.firingTempC ?? 1222)
-  const [atmosphere, setAtmosphere] = useState<'Oxidation' | 'Reduction'>(() => handoff?.atmosphere ?? 'Oxidation')
-  const [loadedRecipeName, setLoadedRecipeName] = useState<string | null>(() => handoff?.name ?? null)
+  const [rows, setRows] = useSessionState<BuilderRow[]>(
+    `${KEY}rows`,
+    (stored) => handoff?.rows ?? (Array.isArray(stored) ? stored : STARTER_RECIPE),
+  )
+  const [firingTempC, setFiringTempC] = useSessionState<number>(
+    `${KEY}tempC`,
+    (stored) => handoff?.firingTempC ?? stored ?? 1222,
+  )
+  const [atmosphere, setAtmosphere] = useSessionState<'Oxidation' | 'Reduction'>(
+    `${KEY}atmosphere`,
+    (stored) => handoff?.atmosphere ?? stored ?? 'Oxidation',
+  )
+  const [loadedRecipeName, setLoadedRecipeName] = useSessionState<string | null>(
+    `${KEY}loadedName`,
+    (stored) => (handoff ? (handoff.name ?? null) : (stored ?? null)),
+  )
   const [analysis, setAnalysis] = useState<AnalyzeResponse | null>(null)
   const [analyzing, setAnalyzing] = useState(false)
   const [analysisError, setAnalysisError] = useState<string | null>(null)
@@ -109,28 +123,34 @@ export function useRecipeBuilder() {
         return [...current, { name, parts: starting }]
       })
     },
-    [materialByName],
+    [materialByName, setRows],
   )
 
-  const removeMaterial = useCallback((name: string) => {
-    setRows((current) => current.filter((row) => row.name !== name))
-  }, [])
+  const removeMaterial = useCallback(
+    (name: string) => {
+      setRows((current) => current.filter((row) => row.name !== name))
+    },
+    [setRows],
+  )
 
-  const setParts = useCallback((name: string, parts: number) => {
-    const clean = Number.isFinite(parts) ? Math.max(0, parts) : 0
-    setRows((current) => current.map((row) => (row.name === name ? { ...row, parts: clean } : row)))
-  }, [])
+  const setParts = useCallback(
+    (name: string, parts: number) => {
+      const clean = Number.isFinite(parts) ? Math.max(0, parts) : 0
+      setRows((current) => current.map((row) => (row.name === name ? { ...row, parts: clean } : row)))
+    },
+    [setRows],
+  )
 
   const clearRecipe = useCallback(() => {
     setRows([])
     setAnalysis(null)
     setLoadedRecipeName(null)
-  }, [])
+  }, [setRows, setLoadedRecipeName])
 
   const loadStarter = useCallback(() => {
     setRows(STARTER_RECIPE)
     setLoadedRecipeName(null)
-  }, [])
+  }, [setRows, setLoadedRecipeName])
 
   const availableMaterials = useMemo(
     () => materials.filter((m) => !rows.some((row) => row.name === m.name)),
