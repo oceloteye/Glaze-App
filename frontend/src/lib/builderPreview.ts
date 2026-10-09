@@ -28,23 +28,21 @@ export function effectForPreview(percentages: Record<string, number>) {
 export type RecipePreviewContext = {
   firingTempC: number
   atmosphere?: string
-  surfaceFinish: string
-  stability: string
-  opacity?: string
 }
 
-/** What a generated recipe's chemistry predicts — the same estimate the builder shows once it is handed off. */
+/** What a generated recipe's chemistry predicts — the same inputs the builder's preview uses once it is handed off. */
 export function recipePreviewOptions(recipe: RecipeSuggestion, context: RecipePreviewContext): GlazePreviewRenderOptions {
   const atmosphere = context.atmosphere ?? 'Oxidation'
-  const reduction = atmosphere.toLowerCase() === 'reduction'
+  const reduction = atmosphere === 'Reduction'
+  const properties = recipe.properties
   return {
     color: predictGlazeColor(recipe.ingredients, reduction, context.firingTempC),
-    surfaceFinish: context.surfaceFinish,
+    surfaceFinish: surfaceForPreview(properties?.surface),
     effect: effectForPreview(recipe.ingredients),
     recipeIngredients: recipe.ingredients,
     firingTempC: context.firingTempC,
-    stability: context.stability,
-    opacity: context.opacity ?? 'Semi-opaque',
+    stability: stabilityForPreview(properties?.meltLabel),
+    opacity: properties?.opacityLabel ?? 'Semi-opaque',
     foodSafe: false,
     atmosphere,
   }

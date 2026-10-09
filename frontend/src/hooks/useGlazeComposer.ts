@@ -140,13 +140,7 @@ export function useGlazeComposer() {
     const previewFor = (recipe: RecipeSuggestion) =>
       options.includePreview
         ? renderGlazePreviewDataUrl(
-            recipePreviewOptions(recipe, {
-              firingTempC: form.firingTempC,
-              atmosphere: form.atmosphere,
-              surfaceFinish: form.surfaceFinish,
-              stability: form.stability,
-              opacity: form.opacity,
-            }),
+            recipePreviewOptions(recipe, { firingTempC: form.firingTempC, atmosphere: form.atmosphere }),
           )
         : null
 
