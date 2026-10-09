@@ -1,13 +1,26 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { CONES } from '../app/constants'
-import type { AnalyzeResponse, MaterialInfo } from '../app/types'
-import { nearestConeIndex } from '../app/utils'
+import type { AnalyzeResponse, GlazeWarning, MaterialInfo } from '../app/types'
+import { cToF, downloadFile, escapeHtml, formatTimestamp, nearestConeIndex } from '../app/utils'
+import { renderGlazePreviewDataUrl } from '../GlazePreview'
 import { parseBuilderHandoff } from '../lib/builderHandoff'
+import { effectForPreview, stabilityForPreview, surfaceForPreview } from '../lib/builderPreview'
 import { predictGlazeColor } from '../lib/glazeColor'
+import {
+  formatParts,
+  ingredientRowsHtml,
+  openPrintSheet,
+  parametersTableHtml,
+  previewFigureHtml,
+  umfHtml,
+} from '../lib/printSheet'
 import { useSessionState } from './useSessionState'
 
 export type BuilderRow = { name: string; parts: number }
+
+const SEVERITY_LABEL: Record<GlazeWarning['severity'], string> = { danger: 'Danger', caution: 'Caution', info: 'Note' }
+const SEVERITY_RANK: Record<GlazeWarning['severity'], number> = { danger: 0, caution: 1, info: 2 }
 
 export const STARTER_RECIPE: BuilderRow[] = [
   { name: 'Potash Feldspar', parts: 40 },
@@ -157,6 +170,96 @@ export function useRecipeBuilder() {
     [materials, rows],
   )
 
+  const recipeTitle = loadedRecipeName ?? 'Custom recipe'
+
+  const buildExportPayload = () => ({
+    exportedAt: new Date().toISOString(),
+    name: recipeTitle,
+    parameters: {
+      firingTempC,
+      firingTempF: cToF(firingTempC),
+      cone: CONES[coneIndex].name,
+      atmosphere,
+      totalParts: Math.round(totalParts * 100) / 100,
+    },
+    recipe: rows.map((row) => ({ ...row, percent: Math.round((percentages[row.name] ?? 0) * 100) / 100 })),
+    predictedColor: previewColor,
+    umf: analysis?.umf,
+    properties: analysis?.properties,
+    warnings: analysis?.warnings ?? [],
+  })
+
+  const handleExportJson = () => {
+    const payload = buildExportPayload()
+    downloadFile(`glaze-builder-${formatTimestamp()}.json`, JSON.stringify(payload, null, 2), 'application/json;charset=utf-8')
+  }
+
+  const handlePrint = (options: { includePreview?: boolean } = {}) => {
+    const payload = buildExportPayload()
+    const properties = analysis?.properties
+    const previewUrl = options.includePreview
+      ? renderGlazePreviewDataUrl({
+          color: previewColor,
+          surfaceFinish: surfaceForPreview(properties?.surface),
+          effect: effectForPreview(percentages),
+          recipeIngredients: percentages,
+          firingTempC,
+          stability: stabilityForPreview(properties?.meltLabel),
+          opacity: properties?.opacityLabel ?? 'Semi-opaque',
+          foodSafe: false,
+          atmosphere,
+        })
+      : null
+
+    const parts = Object.fromEntries(rows.map((row) => [row.name, row.parts]))
+    const propertiesHtml = properties
+      ? `
+        <h4>Predicted properties</h4>
+        <table>
+          <tbody>
+            <tr><th>Melt</th><td>${escapeHtml(properties.meltLabel)}</td></tr>
+            <tr><th>Surface</th><td>${escapeHtml(properties.surface)}</td></tr>
+            <tr><th>Opacity</th><td>${escapeHtml(properties.opacityLabel)}</td></tr>
+            <tr><th>Durability</th><td>${escapeHtml(properties.durabilityLabel)}</td></tr>
+            <tr><th>Expansion</th><td>${properties.expansion.toFixed(0)} ×10⁻⁷/°C · ${escapeHtml(properties.expansionLabel)}</td></tr>
+          </tbody>
+        </table>
+      `
+      : ''
+    const warnings = [...payload.warnings].sort((a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity])
+    const warningsHtml =
+      warnings.length === 0
+        ? ''
+        : `<h2>What to know</h2>${warnings
+            .map(
+              (warning) =>
+                `<div class="warning warning--${warning.severity}"><strong>${escapeHtml(SEVERITY_LABEL[warning.severity])} — ${escapeHtml(warning.title)}</strong><p>${escapeHtml(warning.message)}</p></div>`,
+            )
+            .join('')}`
+
+    const opened = openPrintSheet(
+      'Glaze Builder Recipe',
+      `
+        <h1>Glaze Lab - Recipe Builder</h1>
+        <p class="meta">Generated ${escapeHtml(payload.exportedAt)}</p>
+        <h2>Firing</h2>
+        ${parametersTableHtml(payload.parameters)}
+        <section class="recipe">
+          <h3>${escapeHtml(recipeTitle)}</h3>
+          ${previewFigureHtml(previewUrl, `Predicted appearance of ${recipeTitle}`, `Predicted appearance — ${previewColor.toUpperCase()}`)}
+          <table>
+            <thead><tr><th>Ingredient</th><th>Parts</th><th>Percent</th></tr></thead>
+            <tbody>${ingredientRowsHtml(percentages, parts)}<tr class="group"><th>Total</th><th>${formatParts(totalParts)}</th><th>100%</th></tr></tbody>
+          </table>
+          ${propertiesHtml}
+          ${umfHtml(analysis?.umf)}
+        </section>
+        ${warningsHtml}
+      `,
+    )
+    if (!opened) setAnalysisError('Could not initialize print document in this browser.')
+  }
+
   return {
     materials,
     materialByName,
@@ -180,6 +283,8 @@ export function useRecipeBuilder() {
     setParts,
     clearRecipe,
     loadStarter,
+    handlePrint,
+    handleExportJson,
   }
 }
 
