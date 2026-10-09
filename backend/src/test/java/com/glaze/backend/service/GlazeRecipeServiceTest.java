@@ -69,6 +69,14 @@ class GlazeRecipeServiceTest {
     }
 
     @Test
+    void chromeIsWithheldWhenACrystallineEffectAddsZinc() {
+        var recipes = service.generateRecipes(request("#5f7e58", 1220, "Satin", "Medium", List.of("Crystalline"), 50, null));
+        assertThat(recipes.stream().map(r -> r.route().name())).noneMatch(n -> n.contains("Chrome"));
+        assertThat(recipes).allMatch(r -> r.ingredients().getOrDefault("Chrome Oxide", 0.0) == 0.0);
+        assertThat(recipes.stream().map(RecipeSuggestion::name)).doesNotHaveDuplicates();
+    }
+
+    @Test
     void bariumTurquoiseLeadsAtHighFireUnlessFoodSafe() {
         var open = new GlazeRequest("#3aa6a0", 1260, "Satin", "Medium", null, List.of(), 50, null, null, null, null, false);
         var openRecipes = service.generateRecipes(open);
@@ -82,6 +90,20 @@ class GlazeRecipeServiceTest {
         var safeRecipes = service.generateRecipes(dinnerware);
         assertThat(safeRecipes.get(0).route().name()).isNotEqualTo("Copper in barium");
         assertThat(safeRecipes.stream().map(r -> r.route().name())).anyMatch(n -> n.equals("Copper in barium"));
+    }
+
+    @Test
+    void secondaryColourReachesAlternativeRoutes() {
+        // rust speckle colour on a turquoise: the barium route must carry the iron too, not just the primary cascade
+        var withRust = new GlazeRequest("#3aa6a0", 1260, "Satin", "Medium", null, List.of("Speckled"), 50, "#b5651d", null, null, null, false);
+        var without = new GlazeRequest("#3aa6a0", 1260, "Satin", "Medium", null, List.of("Speckled"), 50, null, null, null, null, false);
+        var barium = service.generateRecipes(withRust).stream()
+                .filter(r -> r.route().name().equals("Copper in barium")).findFirst().orElseThrow();
+        var bariumPlain = service.generateRecipes(without).stream()
+                .filter(r -> r.route().name().equals("Copper in barium")).findFirst().orElseThrow();
+        double iron = barium.ingredients().getOrDefault("Red Iron Oxide", 0.0) + barium.ingredients().getOrDefault("Yellow Iron Oxide", 0.0);
+        double ironPlain = bariumPlain.ingredients().getOrDefault("Red Iron Oxide", 0.0) + bariumPlain.ingredients().getOrDefault("Yellow Iron Oxide", 0.0);
+        assertThat(iron).isGreaterThan(ironPlain + 0.5);
     }
 
     // ── Ingredient totals normalize to 100 % ─────────────────────────────────
