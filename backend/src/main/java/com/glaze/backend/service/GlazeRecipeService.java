@@ -25,7 +25,7 @@ public class GlazeRecipeService {
 
     /**
      * Up to three recipes, each a different colourant route to the asked colour. When fewer distinct routes
-     * exist the remaining slots are filled by the primary route on the high-silica and fluxed bases, labelled
+     * exist the remaining slots are filled by the leading route on the high-silica and fluxed bases, labelled
      * so the melt variants can be told apart.
      */
     public List<RecipeSuggestion> generateRecipes(GlazeRequest request) {
@@ -33,14 +33,17 @@ public class GlazeRecipeService {
         int routeCount = Math.min(RECIPE_COUNT, routes.size());
         int padding = RECIPE_COUNT - routeCount;
 
+        // a route with its own base (barium matte) would ignore the melt variant, so pad with the best one that hasn't
+        ColourRoute filler = routes.stream().filter(route -> route.baseOverride() == null).findFirst().orElse(routes.get(0));
+
         var recipes = new ArrayList<RecipeSuggestion>();
         for (int i = 0; i < routeCount; i++) {
             ColourRoute route = routes.get(i);
-            boolean labelled = i == 0 && padding > 0;
+            boolean labelled = route == filler && padding > 0;
             recipes.add(buildRecipe(route, MELT_VARIANTS[0], labelled, request));
         }
         for (int i = 0; i < padding; i++) {
-            recipes.add(buildRecipe(routes.get(0), MELT_VARIANTS[i + 1], true, request));
+            recipes.add(buildRecipe(filler, MELT_VARIANTS[i + 1], true, request));
         }
         return recipes;
     }

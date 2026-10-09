@@ -37,10 +37,15 @@ import static com.glaze.backend.service.recipe.RecipeIngredients.ZIRCOPAX;
 
 /**
  * Proposes the colourant routes that can reach an asked colour at the requested cone and atmosphere.
- * The first route is always the generator's primary cascade; alternatives are distinct chemistries
- * (chrome instead of copper for a green, nickel-in-zinc instead of cobalt for a soft blue, ...).
+ * Routes are ranked by fitness: the generator's primary cascade sits at {@value #PRIMARY_FITNESS}, most
+ * alternatives below it, and the few classic chemistries a potter would reach for first (chrome for a
+ * muted green, barium copper for a high-fire turquoise) above it so they lead the results.
  */
 public final class ColourRoutes {
+
+    private static final double PRIMARY_FITNESS = 1.0;
+    /** Above the primary: this route is the idiomatic recipe for the colour, not just a viable alternative. */
+    private static final double LEADS = 1.2;
 
     /** Materials that only opacify or soften; never the headline of a route. */
     private static final Set<String> OPACIFIERS = Set.of(ZIRCOPAX, TIN_OXIDE, TITANIUM_DIOXIDE);
@@ -81,7 +86,7 @@ public final class ColourRoutes {
     private ColourRoutes() {
     }
 
-    /** Routes for the request, primary first, then alternatives by descending fitness. Never empty. */
+    /** Routes for the request by descending fitness; ties keep the primary ahead of alternatives. Never empty. */
     public static List<ColourRoute> propose(GlazeRequest request) {
         int tempC = request.firingTempC();
         ColourRoute primary = primary(request);
@@ -94,6 +99,7 @@ public final class ColourRoutes {
         double[] hsl = RecipeColorUtil.hexToHsl(request.color());
         double h = hsl[0], s = hsl[1], l = hsl[2];
         boolean reduction = "reduction".equalsIgnoreCase(request.atmosphere());
+        boolean foodSafe = Boolean.TRUE.equals(request.foodSafe());
         boolean zincFreeBase = RecipeBaseFactory.standardBase(tempC).getOrDefault(ZINC_OXIDE, 0.0) < 3.0;
 
         var alternatives = new ArrayList<ColourRoute>();
@@ -105,7 +111,7 @@ public final class ColourRoutes {
             alternatives.add(new ColourRoute("Chrome green",
                     "Chrome oxide gives an opaque, stable leaf green at a trace dose; it must stay away from zinc (brown) and tin (pink).",
                     List.of(CHROME_OXIDE), null,
-                    formula -> RecipeMath.adjust(formula, CHROME_OXIDE, chrome), 0.8));
+                    formula -> RecipeMath.adjust(formula, CHROME_OXIDE, chrome), LEADS));
         }
         if (!reduction && tempC >= 1240 && h >= 60 && h < 160 && s < 0.3 && l >= 0.35 && l < 0.7) {
             double nickel = 0.8 + 1.0 * RecipeMath.clamp01((0.6 - l) / 0.25);
@@ -151,10 +157,11 @@ public final class ColourRoutes {
             bariumBase.put(BARIUM_CARBONATE, 30.0);
             bariumBase.put(SILICA, 20.0);
             bariumBase.put(EPK_KAOLIN, 10.0);
+            // barium is the classic turquoise, but never lead a dinnerware ask with it
             alternatives.add(new ColourRoute("Copper in barium",
                     "The classic high-fire barium matte: barium turns copper a true turquoise-blue and gives a silky matte surface. Not for food surfaces.",
                     List.of(BARIUM_CARBONATE, COPPER_CARBONATE), bariumBase,
-                    formula -> RecipeMath.adjust(formula, COPPER_CARBONATE, copper), 0.7));
+                    formula -> RecipeMath.adjust(formula, COPPER_CARBONATE, copper), foodSafe ? 0.7 : LEADS));
         }
 
         // ── browns / tans ──────────────────────────────────────────────────────
@@ -205,8 +212,9 @@ public final class ColourRoutes {
         Set<String> primarySignature = Set.copyOf(primary.signature());
         alternatives.stream()
                 .filter(route -> !Set.copyOf(route.signature()).equals(primarySignature))
-                .sorted(Comparator.comparingDouble(ColourRoute::fitness).reversed())
                 .forEach(routes::add);
+        // stable sort: equal fitness keeps insertion order, so the primary stays ahead of its peers
+        routes.sort(Comparator.comparingDouble(ColourRoute::fitness).reversed());
         return routes;
     }
 
@@ -231,7 +239,7 @@ public final class ColourRoutes {
         if (archetype != null) {
             return new ColourRoute(archetype,
                     "A whole-recipe family rather than a colourant on a generic base: the melt itself is tuned so this colour can form.",
-                    signature, null, cascade, 1.0);
+                    signature, null, cascade, PRIMARY_FITNESS);
         }
 
         List<String> leads = added.stream()
@@ -243,11 +251,11 @@ public final class ColourRoutes {
                 .toList();
         if (leads.isEmpty()) {
             return new ColourRoute("Clear base", "No colourant: the base glaze reads as the clay body beneath it.",
-                    List.of(), null, cascade, 1.0);
+                    List.of(), null, cascade, PRIMARY_FITNESS);
         }
         String name = String.join(" + ", leads);
         String summary = LEAD_SUMMARY.getOrDefault(leads.get(0), "Standard colourant route for this hue.");
-        return new ColourRoute(name, summary, signature, null, cascade, 1.0);
+        return new ColourRoute(name, summary, signature, null, cascade, PRIMARY_FITNESS);
     }
 
     private static List<String> addedColourants(Map<String, Double> before, Map<String, Double> after) {
