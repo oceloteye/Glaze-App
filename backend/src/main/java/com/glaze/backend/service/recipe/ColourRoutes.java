@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
@@ -100,7 +101,11 @@ public final class ColourRoutes {
         double h = hsl[0], s = hsl[1], l = hsl[2];
         boolean reduction = "reduction".equalsIgnoreCase(request.atmosphere());
         boolean foodSafe = Boolean.TRUE.equals(request.foodSafe());
-        boolean zincFreeBase = RecipeBaseFactory.standardBase(tempC).getOrDefault(ZINC_OXIDE, 0.0) < 3.0;
+        // a crystalline effect loads the melt with zinc, so chrome would brown even over a zinc-free base
+        boolean crystalline = request.effects() != null
+                && request.effects().stream().anyMatch(e -> e != null && e.toLowerCase(Locale.ROOT).contains("crystal"));
+        boolean zincFreeBase = !crystalline
+                && RecipeBaseFactory.standardBase(tempC).getOrDefault(ZINC_OXIDE, 0.0) < 3.0;
 
         var alternatives = new ArrayList<ColourRoute>();
 
@@ -212,10 +217,23 @@ public final class ColourRoutes {
         Set<String> primarySignature = Set.copyOf(primary.signature());
         alternatives.stream()
                 .filter(route -> !Set.copyOf(route.signature()).equals(primarySignature))
+                .map(route -> withSecondaryColour(route, request))
                 .forEach(routes::add);
         // stable sort: equal fitness keeps insertion order, so the primary stays ahead of its peers
         routes.sort(Comparator.comparingDouble(ColourRoute::fitness).reversed());
         return routes;
+    }
+
+    /** The primary cascade already doses the secondary (speckle / variegation) colour; alternatives must too. */
+    private static ColourRoute withSecondaryColour(ColourRoute route, GlazeRequest request) {
+        if (!isValidHex(request.secondaryColor())) {
+            return route;
+        }
+        Consumer<Map<String, Double>> colourants = route.colourants().andThen(formula ->
+                RecipeModifier.applyColorants(formula, null, request.secondaryColor(), request.colorCharacter(),
+                        request.firingTempC(), request.atmosphere()));
+        return new ColourRoute(route.name(), route.summary(), route.signature(), route.baseOverride(),
+                colourants, route.fitness());
     }
 
     /** The generator's existing colourant cascade, described by what it actually adds to the standard base. */
