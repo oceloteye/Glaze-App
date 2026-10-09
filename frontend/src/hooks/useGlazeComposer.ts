@@ -3,6 +3,7 @@ import type { FormEvent } from 'react'
 import { buildFiringScheduleExport, firingScheduleFileStem, firingScheduleToCsv } from '../lib/firingScheduleExport'
 import { CONES, EFFECTS_WITH_SECONDARY } from '../app/constants'
 import { renderGlazePreviewDataUrl } from '../GlazePreview'
+import { recipePreviewOptions } from '../lib/builderPreview'
 import { ingredientRowsHtml, openPrintSheet, parametersTableHtml, previewFigureHtml, umfHtml } from '../lib/printSheet'
 import { useSessionState } from './useSessionState'
 import type {
@@ -53,7 +54,6 @@ export function useGlazeComposer() {
   const currentEffect = form.effects[0] ?? ''
   const showSecondaryColor = EFFECTS_WITH_SECONDARY.has(currentEffect)
   const coneIndex = useMemo(() => nearestConeIndex(form.firingTempC, CONES), [form.firingTempC])
-  const selectedRecipe = recipes[0]
   const hasGeneratedRecipes = recipes.length > 0
 
   const scheduleFor = (recipe: RecipeSuggestion) =>
@@ -139,19 +139,15 @@ export function useGlazeComposer() {
     const payload = buildExportPayload()
     const previewFor = (recipe: RecipeSuggestion) =>
       options.includePreview
-        ? renderGlazePreviewDataUrl({
-            color: form.color,
-            surfaceFinish: form.surfaceFinish,
-            effect: form.effects[0] ?? '',
-            secondaryColor: showSecondaryColor ? secondaryColor : undefined,
-            intensity: effectIntensity,
-            recipeIngredients: recipe.ingredients,
-            firingTempC: form.firingTempC,
-            stability: form.stability,
-            opacity: form.opacity,
-            foodSafe: form.foodSafe ?? false,
-            atmosphere: form.atmosphere,
-          })
+        ? renderGlazePreviewDataUrl(
+            recipePreviewOptions(recipe, {
+              firingTempC: form.firingTempC,
+              atmosphere: form.atmosphere,
+              surfaceFinish: form.surfaceFinish,
+              stability: form.stability,
+              opacity: form.opacity,
+            }),
+          )
         : null
 
     const recipeSections = payload.recipes
@@ -188,7 +184,7 @@ export function useGlazeComposer() {
           <section class="recipe">
             <h3>${escapeHtml(recipe.name)}</h3>
             <p class="range">${escapeHtml(recipe.firingRange)}</p>
-            ${previewFigureHtml(previewFor(recipe), `Predicted appearance of ${recipe.name}`, `Predicted appearance — ${form.color.toUpperCase()}`)}
+            ${previewFigureHtml(previewFor(recipe), `Predicted appearance of ${recipe.name} from its chemistry`, `Predicted from chemistry — colour goal ${form.color.toUpperCase()}`)}
             <p>${escapeHtml(recipe.rationale)}</p>
             <table>
               <thead><tr><th>Ingredient</th><th>Percent</th></tr></thead>
@@ -238,7 +234,6 @@ export function useGlazeComposer() {
     currentEffect,
     showSecondaryColor,
     coneIndex,
-    selectedRecipe,
     hasGeneratedRecipes,
     handleSubmit,
     handlePrint,
