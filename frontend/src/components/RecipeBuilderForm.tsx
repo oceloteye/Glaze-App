@@ -101,9 +101,12 @@ export function RecipeBuilderForm({ builder }: Props) {
     clearRecipe,
     loadStarter,
     loadedRecipeName,
+    handlePrint,
+    handleExportJson,
   } = builder
 
   const [pendingMaterial, setPendingMaterial] = useState('')
+  const [printPreview, setPrintPreview] = useState(false)
   const grouped = groupByCategory(availableMaterials)
 
   const handleAdd = () => {
@@ -129,6 +132,20 @@ export function RecipeBuilderForm({ builder }: Props) {
         <p className="builder-loaded">
           Loaded from the generator: <strong>{loadedRecipeName}</strong>
         </p>
+      ) : null}
+      {rows.length > 0 ? (
+        <div className="results-actions">
+          <button type="button" className="ghost-btn" onClick={() => handlePrint({ includePreview: printPreview })}>
+            Print Recipe Sheet
+          </button>
+          <label className="print-option">
+            <input type="checkbox" checked={printPreview} onChange={(event) => setPrintPreview(event.target.checked)} />
+            Include preview image
+          </label>
+          <button type="button" className="ghost-btn" onClick={handleExportJson}>
+            Export JSON
+          </button>
+        </div>
       ) : null}
 
       <div className="builder-firing">
