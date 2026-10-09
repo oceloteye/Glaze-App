@@ -203,49 +203,87 @@ function lobeDepth(lobes: Lobe[], dx: number) {
   return d
 }
 
-/** Lower outline of the dab sampled left→right, including sag and any runs. */
-function lowerEdge(cx: number, cy: number, radius: number, sag: number, lobes: Lobe[]) {
+/** Lower outline of the patch sampled left→right, including the slump bow and any runs. */
+function lowerEdge(p: Patch) {
   const steps = 96
   const pts: { x: number; y: number }[] = []
   for (let i = 0; i <= steps; i++) {
-    const dx = -radius + (2 * radius * i) / steps
-    const base = Math.sqrt(Math.max(0, radius * radius - dx * dx)) * (1 + sag)
-    // runs fade out toward the sides so the outline still meets the circle cleanly
-    const sideFade = clamp(1 - Math.pow(Math.abs(dx) / radius, 6), 0, 1)
-    pts.push({ x: cx + dx, y: cy + base + lobeDepth(lobes, dx) * sideFade })
+    const dx = -p.half + (2 * p.half * i) / steps
+    // runs fade out toward the sides so the outline still meets the corners cleanly
+    const sideFade = clamp(1 - Math.pow(Math.abs(dx) / p.half, 6), 0, 1)
+    pts.push({ x: p.cx + dx, y: p.cy + footDepth(p, dx) + lobeDepth(p.lobes, dx) * sideFade })
   }
   return pts
 }
 
-/** A few runs of mixed size: one hero, one medium, and short lobes that barely leave the pool. */
-function makeLobes(radius: number, melt: number, flow: number, maxDepth: number, rng: () => number) {
-  const count = 3 + Math.round(rng() * 1.5 + flow)
-  const span = 1.3
-  const slot = span / count
-  const order = Array.from({ length: count }, (_, i) => i).sort(() => rng() - 0.5)
-  const push = melt * (0.8 + flow * 0.4)
-  return order.map<Lobe>((i, k) => {
-    const x = (-span / 2 + slot * (i + 0.15 + rng() * 0.7)) * radius
-    const w = radius * (0.09 + rng() * 0.09) * (k === 0 ? 1.25 : 1)
-    const reach = k === 0 ? 0.42 + rng() * 0.22 : k === 1 ? 0.16 + rng() * 0.14 : 0.03 + rng() * 0.08
-    return { x, w, d: Math.min(maxDepth, radius * reach * push) }
-  })
+/** The square glaze patch: centre, half-size, corner radius, how far the foot slumps (0–1) and any runs. */
+type Patch = { cx: number; cy: number; half: number; corner: number; sag: number; lobes: Lobe[] }
+
+/** Depth of the plain lower outline below the centre at horizontal offset `dx`: rounded corner plus slump bow. */
+function footDepth(p: Patch, dx: number) {
+  const u = clamp(dx / p.half, -1, 1)
+  const inset = Math.max(0, Math.abs(dx) - (p.half - p.corner))
+  const cornerDrop = p.corner - Math.sqrt(Math.max(0, p.corner * p.corner - inset * inset))
+  return p.half - cornerDrop + p.sag * p.half * (1 - u * u)
+}
+
+/** Distance from a point to the patch outline, positive inside. The slumped foot is un-bowed first so the rim hugs it. */
+function patchInset(p: Patch, px: number, py: number) {
+  const dx = px - p.cx
+  let dy = py - p.cy
+  if (dy > 0) {
+    const u = clamp(dx / p.half, -1, 1)
+    dy /= 1 + p.sag * (1 - u * u)
+  }
+  const qx = Math.abs(dx) - (p.half - p.corner)
+  const qy = Math.abs(dy) - (p.half - p.corner)
+  const outside = Math.hypot(Math.max(qx, 0), Math.max(qy, 0))
+  const inside = Math.min(Math.max(qx, qy), 0)
+  return -(outside + inside - p.corner)
+}
+
+/** A horizontal ridge pressed into the tile: centre y and half-width, in px. */
+type Ridge = { y: number; w: number }
+
+function makeRidges(p: Patch): Ridge[] {
+  const top = p.cy - p.half
+  return [0.3, 0.55, 0.8].map((f) => ({ y: top + f * 2 * p.half, w: p.half * 0.085 }))
+}
+
+/** How much of a ridge crest sits under `py`, 0–1. */
+function ridgeCrest(ridges: Ridge[], py: number) {
+  let c = 0
+  for (const r of ridges) {
+    const u = (py - r.y) / r.w
+    c = Math.max(c, Math.exp(-u * u * 2.5))
+  }
+  return c
+}
+
+/** Light raking from above: the upper face of each ridge is lit, the lower face shaded. */
+function drawRidgeRelief(ctx: CanvasRenderingContext2D, ridges: Ridge[], w: number, strength: number) {
+  for (const r of ridges) {
+    const y0 = r.y - r.w * 1.6
+    const y1 = r.y + r.w * 1.6
+    const g = ctx.createLinearGradient(0, y0, 0, y1)
+    g.addColorStop(0, 'rgba(255,255,255,0)')
+    g.addColorStop(0.32, `rgba(255,255,255,${0.32 * strength})`)
+    g.addColorStop(0.48, `rgba(255,255,255,${0.1 * strength})`)
+    g.addColorStop(0.52, `rgba(60,40,20,${0.08 * strength})`)
+    g.addColorStop(0.68, `rgba(60,40,20,${0.34 * strength})`)
+    g.addColorStop(1, 'rgba(60,40,20,0)')
+    ctx.fillStyle = g
+    ctx.fillRect(0, y0, w, y1 - y0)
+  }
 }
 
 /** Thick-glass shading for each run: deeper tone toward the tip, lit shoulder, dark meniscus. */
-function shadeLobes(
-  ctx: CanvasRenderingContext2D,
-  cx: number,
-  cy: number,
-  radius: number,
-  sag: number,
-  lobes: Lobe[],
-  gloss: number,
-) {
+function shadeLobes(ctx: CanvasRenderingContext2D, p: Patch, gloss: number) {
+  const { cx, cy, half: radius, lobes } = p
   for (const l of lobes) {
     if (l.d < radius * 0.05) continue
     const ax = cx + l.x
-    const edgeY = cy + Math.sqrt(Math.max(0, radius * radius - l.x * l.x)) * (1 + sag)
+    const edgeY = cy + footDepth(p, l.x)
     const tipY = edgeY + lobeDepth(lobes, l.x)
     const span = tipY - edgeY
     // glass thickens toward the tip
@@ -278,17 +316,37 @@ function shadeLobes(
   }
 }
 
-/** Glaze dab outline; `sag` stretches the lower half so a fluid melt visibly slumps, `lobes` hang runs off it. */
-function discPath(ctx: CanvasRenderingContext2D, cx: number, cy: number, radius: number, sag: number, lobes: Lobe[] = []) {
+/** Glaze patch outline: rounded square whose foot bows with the slump and, unless `plain`, hangs the runs. */
+function patchPath(ctx: CanvasRenderingContext2D, p: Patch, plain = false) {
+  const { cx, cy, half, corner } = p
+  const left = cx - half
+  const right = cx + half
+  const top = cy - half
   ctx.beginPath()
-  ctx.arc(cx, cy, radius, Math.PI, 0)
-  if (lobes.length === 0) {
-    ctx.ellipse(cx, cy, radius, radius * (1 + sag), 0, 0, Math.PI)
-  } else {
-    const edge = lowerEdge(cx, cy, radius, sag, lobes)
-    for (let i = edge.length - 1; i >= 0; i--) ctx.lineTo(edge[i].x, edge[i].y)
-  }
+  ctx.moveTo(left, cy + half - corner)
+  ctx.lineTo(left, top + corner)
+  ctx.arcTo(left, top, left + corner, top, corner)
+  ctx.lineTo(right - corner, top)
+  ctx.arcTo(right, top, right, top + corner, corner)
+  ctx.lineTo(right, cy + half - corner)
+  const edge = lowerEdge(plain ? { ...p, lobes: [] } : p)
+  for (let i = edge.length - 1; i >= 0; i--) ctx.lineTo(edge[i].x, edge[i].y)
   ctx.closePath()
+}
+
+/** A few runs of mixed size: one hero, one medium, and short lobes that barely leave the pool. */
+function makeLobes(radius: number, melt: number, flow: number, maxDepth: number, rng: () => number) {
+  const count = 3 + Math.round(rng() * 1.5 + flow)
+  const span = 1.3
+  const slot = span / count
+  const order = Array.from({ length: count }, (_, i) => i).sort(() => rng() - 0.5)
+  const push = melt * (0.8 + flow * 0.4)
+  return order.map<Lobe>((i, k) => {
+    const x = (-span / 2 + slot * (i + 0.15 + rng() * 0.7)) * radius
+    const w = radius * (0.09 + rng() * 0.09) * (k === 0 ? 1.25 : 1)
+    const reach = k === 0 ? 0.42 + rng() * 0.22 : k === 1 ? 0.16 + rng() * 0.14 : 0.03 + rng() * 0.08
+    return { x, w, d: Math.min(maxDepth, radius * reach * push) }
+  })
 }
 
 function roundedRectPath(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
@@ -301,8 +359,8 @@ function roundedRectPath(ctx: CanvasRenderingContext2D, x: number, y: number, w:
   ctx.closePath()
 }
 
-/** Bisque tile the glaze sits on: warm buff gradient with a light grog speckle. */
-function drawTile(ctx: CanvasRenderingContext2D, w: number, h: number, rng: () => number) {
+/** Bisque tile the glaze sits on: warm buff gradient with a light grog speckle and pressed ridges. */
+function drawTile(ctx: CanvasRenderingContext2D, w: number, h: number, ridges: Ridge[], rng: () => number) {
   roundedRectPath(ctx, 0, 0, w, h, TILE_CORNER)
   const base = ctx.createLinearGradient(0, 0, w * 0.4, h)
   base.addColorStop(0, `rgb(${TILE_RGB.r + 10},${TILE_RGB.g + 10},${TILE_RGB.b + 10})`)
@@ -321,6 +379,7 @@ function drawTile(ctx: CanvasRenderingContext2D, w: number, h: number, rng: () =
     ctx.arc(x, y, 0.5 + rng() * 1.1, 0, Math.PI * 2)
     ctx.fill()
   }
+  drawRidgeRelief(ctx, ridges, w, 1)
   const vignette = ctx.createRadialGradient(w / 2, h / 2, w * 0.35, w / 2, h / 2, w * 0.75)
   vignette.addColorStop(0, 'rgba(0,0,0,0)')
   vignette.addColorStop(1, 'rgba(70,45,25,0.16)')
@@ -378,24 +437,26 @@ function drawGlaze(
   const rng = seededRng(hashStr(color + surfaceFinish + effect + (secHex ?? '') + stability + opacityTarget + recipeSeed))
   const sag = melt * 0.22
   const bottomY = cy + radius * (1 + sag)
-  // a fluid glaze runs off the dab as a few tongues that are part of the same outline
+  // a fluid glaze runs off the patch as a few tongues that are part of the same outline
   const lobes = melt > 0.55 ? makeLobes(radius, melt, chemistry.flow, h - 8 - bottomY, rng) : []
+  const patch: Patch = { cx, cy, half: radius, corner: radius * 0.12, sag, lobes }
+  const ridges = makeRidges(patch)
 
-  drawTile(ctx, w, h, seededRng(hashStr('tile')))
+  drawTile(ctx, w, h, ridges, seededRng(hashStr('tile')))
 
-  // ── drop shadow under the glaze dab ───────────────────────────────
+  // ── drop shadow under the glaze patch ───────────────────────────────
   ctx.save()
   ctx.shadowColor = 'rgba(50,30,15,0.35)'
   ctx.shadowBlur = 18
   ctx.shadowOffsetY = 6
   ctx.fillStyle = `rgb(${r},${g},${b})`
-  discPath(ctx, cx, cy, radius, sag, lobes)
+  patchPath(ctx, patch)
   ctx.fill()
   ctx.restore()
 
-  // ── clip to disc ──────────────────────────────────────────────
+  // ── clip to patch ──────────────────────────────────────────────
   ctx.save()
-  discPath(ctx, cx, cy, radius, sag, lobes)
+  patchPath(ctx, patch)
   ctx.clip()
 
   // ── base fill ─────────────────────────────────────────────────
@@ -412,6 +473,8 @@ function drawGlaze(
     ctx.fillStyle = pool
     ctx.fillRect(0, 0, w, h)
   }
+  // the coat drapes over the ridges, so their relief reads through it
+  drawRidgeRelief(ctx, ridges, w, 0.5)
 
   // ── opacity: a property of the glaze, drawn under any colour effect ──
   if (opacityTarget === 'Opaque') {
@@ -802,14 +865,13 @@ function drawGlaze(
     paintLayer(
       ctx,
       noiseLayer(144, (x, y) => {
-        // thickness: thin at the crown and toward the rim, thick at the foot; the grain mottles it
+        // thickness: thin at the crown, the rim and over the ridges, thick at the foot; the grain mottles it
         const ny = (y * h - topY) / (bottomY - topY)
-        const dx = (x * w - cx) / radius
-        const dy = (y * h - cy) / radius
-        const dist = Math.sqrt(dx * dx + dy * dy)
+        const inset = patchInset(patch, x * w, y * h) / radius
         // the rim is thinnest at the crown; the foot carries the heaviest glass
-        const rimThin = clamp((dist - 0.6) / 0.4, 0, 1) * (1 - ny * 0.7)
-        const thickness = clamp(ny * 0.8 + 0.1 - rimThin * 0.9 + (grain(x * 1.4, y * 0.8, 3) - 0.5) * 0.7, 0, 1)
+        const rimThin = clamp((0.4 - inset) / 0.4, 0, 1) * (1 - ny * 0.7)
+        const crestThin = ridgeCrest(ridges, y * h) * 0.55
+        const thickness = clamp(ny * 0.8 + 0.1 - rimThin * 0.9 - crestThin + (grain(x * 1.4, y * 0.8, 3) - 0.5) * 0.7, 0, 1)
         if (thickness < 0.42) return [black.r, black.g, black.b, clamp((0.42 - thickness) * 3, 0, 1) * 0.9 * ironRed]
         // crystalline bloom in the thick zones: a brighter rust that glints
         const bloom = clamp((grain(x * 3 + 7, y * 3 + 3, 2) - 0.52) * 4, 0, 1) * clamp((thickness - 0.5) * 2, 0, 1)
@@ -820,12 +882,41 @@ function drawGlaze(
     )
   }
 
+  // ── ridges: the coat thins over each crest and shows the clay, then pools in the trough below ──
+  // an iron saturate already breaks to black over the crests, so it barely shows clay
+  const ridgeBreak = clamp(0.55 - chemistry.opacity * 0.4 + chemistry.flow * 0.35, 0.08, 0.8) * (1 - ironRed * 0.85)
+  const breakGrain = makeNoise(rng, 9)
+  paintLayer(
+    ctx,
+    noiseLayer(160, (x, y) => {
+      // the crest only shows through in patches, where the coat happened to be thinnest
+      const crest = clamp((ridgeCrest(ridges, y * h) - 0.3) / 0.7, 0, 1)
+      const patchy = clamp((breakGrain(x * 4, y * 1.5, 3) - 0.38) * 2.4, 0, 1)
+      const thin = crest * crest * (0.25 + patchy * 0.75) * ridgeBreak
+      return [TILE_RGB.r, TILE_RGB.g, TILE_RGB.b, thin]
+    }),
+    w,
+    h,
+  )
+  ctx.save()
+  ctx.globalCompositeOperation = 'multiply'
+  for (const ridge of ridges) {
+    const pool = ctx.createLinearGradient(0, ridge.y + ridge.w * 0.7, 0, ridge.y + ridge.w * 3.2)
+    pool.addColorStop(0, `rgba(${r},${g},${b},${clamp(0.25 + chemistry.flow * 0.5, 0, 0.75)})`)
+    pool.addColorStop(1, `rgba(${r},${g},${b},0)`)
+    ctx.fillStyle = pool
+    ctx.fillRect(0, ridge.y, w, ridge.w * 3.2)
+  }
+  ctx.restore()
+
   // ── surface-finish sheen ──────────────────────────────────────
   const finishTarget =
     surfaceFinish === 'Glossy' ? 0.92 : surfaceFinish === 'Satin' ? 0.55 : 0.2
   const effectiveGloss = clamp((finishTarget + chemistry.gloss) / 2, 0, 1)
 
-  if (lobes.length > 0) shadeLobes(ctx, cx, cy, radius, sag, lobes, effectiveGloss)
+  if (lobes.length > 0) shadeLobes(ctx, patch, effectiveGloss)
+  // a glossy coat catches the light on the ridge shoulders
+  drawRidgeRelief(ctx, ridges, w, 0.25 + effectiveGloss * 0.5)
 
   if (effectiveGloss > 0.72) {
     const bg = ctx.createRadialGradient(cx - radius * 0.22, cy - radius * 0.22, 0, cx, cy, radius)
@@ -867,39 +958,45 @@ function drawGlaze(
   // an iron saturate breaks to black instead of to bare clay
   const breakStrength = clamp(0.35 - chemistry.opacity * 0.3 + chemistry.flow * 0.15, 0.04, 0.4) * (1 - ironRed * 0.85)
   ctx.save()
-  discPath(ctx, cx, cy, radius, sag)
+  patchPath(ctx, patch, true)
   ctx.clip()
-  const edge = ctx.createRadialGradient(cx, cy, radius * 0.86, cx, cy, radius)
-  edge.addColorStop(0, `rgba(${TILE_RGB.r},${TILE_RGB.g},${TILE_RGB.b},0)`)
-  edge.addColorStop(0.75, `rgba(${TILE_RGB.r},${TILE_RGB.g},${TILE_RGB.b},${breakStrength * 0.5})`)
-  edge.addColorStop(1, `rgba(${TILE_RGB.r},${TILE_RGB.g},${TILE_RGB.b},${breakStrength})`)
-  const rim = ctx.createRadialGradient(cx, cy, radius * 0.84, cx, cy, radius)
-  rim.addColorStop(0, 'rgba(0,0,0,0)')
-  rim.addColorStop(1, 'rgba(0,0,0,0.22)')
-  // the lower half is stretched with the sag so the rim gradients hug the real outline
-  const fillRim = (style: CanvasGradient) => {
-    ctx.fillStyle = style
-    ctx.fillRect(0, 0, w, cy)
-    ctx.save()
-    ctx.beginPath()
-    ctx.rect(0, cy, w, h - cy)
-    ctx.clip()
-    ctx.translate(cx, cy)
-    ctx.scale(1, 1 + sag)
-    ctx.translate(-cx, -cy)
-    ctx.fillRect(0, 0, w, h)
-    ctx.restore()
-  }
-  fillRim(edge)
-  fillRim(rim)
+  const rimBand = radius * 0.16
+  paintLayer(
+    ctx,
+    noiseLayer(160, (x, y) => {
+      const t = clamp(1 - patchInset(patch, x * w, y * h) / rimBand, 0, 1)
+      return [TILE_RGB.r, TILE_RGB.g, TILE_RGB.b, t * t * breakStrength]
+    }),
+    w,
+    h,
+  )
+  paintLayer(
+    ctx,
+    noiseLayer(160, (x, y) => {
+      const t = clamp(1 - patchInset(patch, x * w, y * h) / (rimBand * 0.85), 0, 1)
+      return [0, 0, 0, t * t * 0.22]
+    }),
+    w,
+    h,
+  )
   ctx.restore()
 
   // ── bevel: lit upper-left lip, shaded lower-right lip ─────────
+  const left = cx - radius
+  const top = cy - radius
+  const corner = patch.corner
   ctx.save()
   ctx.lineWidth = 2
   ctx.beginPath()
-  ctx.arc(cx, cy, radius - 1, Math.PI * 0.95, Math.PI * 1.75)
-  ctx.strokeStyle = `rgba(255,255,255,${0.18 + effectiveGloss * 0.3})`
+  ctx.moveTo(left + 1, cy + radius * 0.7)
+  ctx.lineTo(left + 1, top + corner)
+  ctx.arcTo(left + 1, top + 1, left + corner, top + 1, corner - 1)
+  ctx.lineTo(cx + radius * 0.85, top + 1)
+  // fades out along both arms so the lit lip doesn't end in a step
+  const lit = ctx.createLinearGradient(left, top, cx + radius * 0.4, cy + radius * 0.4)
+  lit.addColorStop(0, `rgba(255,255,255,${0.18 + effectiveGloss * 0.3})`)
+  lit.addColorStop(1, 'rgba(255,255,255,0)')
+  ctx.strokeStyle = lit
   ctx.stroke()
   // the shaded lip follows the real lower outline, runs included
   ctx.save()
@@ -907,11 +1004,11 @@ function drawGlaze(
   ctx.rect(cx - radius * 0.55, cy, w, h - cy)
   ctx.clip()
   ctx.translate(0, -1)
-  discPath(ctx, cx, cy, radius, sag, lobes)
+  patchPath(ctx, patch)
   ctx.strokeStyle = 'rgba(40,25,12,0.22)'
   ctx.stroke()
   ctx.restore()
-  discPath(ctx, cx, cy, radius, sag, lobes)
+  patchPath(ctx, patch)
   ctx.lineWidth = 1
   ctx.strokeStyle = 'rgba(60,40,20,0.3)'
   ctx.stroke()
