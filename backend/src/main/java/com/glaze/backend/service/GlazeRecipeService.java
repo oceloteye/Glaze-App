@@ -6,6 +6,7 @@ import com.glaze.backend.dto.RecipeSuggestion;
 import com.glaze.backend.service.recipe.ColourRoute;
 import com.glaze.backend.service.recipe.ColourRoutes;
 import com.glaze.backend.service.recipe.FiringScheduleBuilder;
+import com.glaze.backend.service.recipe.GlazeAnalyzer;
 import com.glaze.backend.service.recipe.RecipeBaseFactory;
 import com.glaze.backend.service.recipe.RecipeMath;
 import com.glaze.backend.service.recipe.RecipeModifier;
@@ -77,6 +78,8 @@ public class GlazeRecipeService {
                 formula,
                 RecipeNarrativeBuilder.buildRationale(meltVariant, route.summary(), req, formula),
                 UmfCalculator.calculate(formula),
+                // same analysis the Recipe Builder runs, so previews agree across the handoff
+                GlazeAnalyzer.analyze(formula, tempC, req.atmosphere()).properties(),
                 FiringScheduleBuilder.buildAll(meltVariant, req, formula),
                 new RecipeRoute(route.name(), route.summary(), route.signature()));
     }
