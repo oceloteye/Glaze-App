@@ -837,6 +837,23 @@
   font-size: 0.76rem;
 }
 
+a.ghost-btn {
+  display: inline-block;
+  text-decoration: none;
+}
+
+.recipe-card__actions {
+  margin-top: 0.8rem;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.builder-loaded {
+  margin: 0 0 0.6rem;
+  font-size: 0.84rem;
+  color: var(--text-muted);
+}
+
 .firing-schedule__table {
   width: 100%;
   border-collapse: collapse;
