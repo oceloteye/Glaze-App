@@ -20,7 +20,7 @@ export function HomePage() {
         </div>
       </section>
 
-      <section className="support-card">
+      {/* <section className="support-card">
         <div>
           <h2>Support Glaze Lab</h2>
           <p>
@@ -36,7 +36,7 @@ export function HomePage() {
         >
           Support on Ko-fi
         </a>
-      </section>
+      </section> */}
     </>
   )
 }
