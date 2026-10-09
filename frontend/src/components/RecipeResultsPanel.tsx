@@ -170,14 +170,8 @@ export function RecipeResultsPanel({ composer }: Props) {
   } = composer
   const [printPreview, setPrintPreview] = useState(false)
   const previewContext = useMemo<RecipePreviewContext>(
-    () => ({
-      firingTempC: form.firingTempC,
-      atmosphere: form.atmosphere,
-      surfaceFinish: form.surfaceFinish,
-      stability: form.stability,
-      opacity: form.opacity,
-    }),
-    [form.firingTempC, form.atmosphere, form.surfaceFinish, form.stability, form.opacity],
+    () => ({ firingTempC: form.firingTempC, atmosphere: form.atmosphere }),
+    [form.firingTempC, form.atmosphere],
   )
 
   return (

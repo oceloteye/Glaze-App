@@ -9,6 +9,7 @@ public record RecipeSuggestion(
         Map<String, Double> ingredients,
         String rationale,
         Umf umf,
+        GlazeProperties properties,
         List<FiringSchedule> firingSchedules,
         RecipeRoute route
 ) {
