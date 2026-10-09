@@ -62,6 +62,7 @@ export type RecipeSuggestion = {
   ingredients: Record<string, number>
   rationale: string
   umf: Umf
+  properties?: GlazeProperties
   firingSchedules: FiringSchedule[]
   route?: RecipeRoute
 }

@@ -1,10 +1,12 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import type { GlazeComposer } from '../hooks/useGlazeComposer'
 import type { FiringSchedule, RecipeSuggestion, ScheduleLength } from '../app/types'
 import { INGREDIENT_INFO } from '../app/constants'
 import { splitIngredients, sumPercent, type IngredientEntry } from '../app/utils'
+import { renderGlazePreviewDataUrl } from '../GlazePreview'
 import { builderHref } from '../lib/builderHandoff'
+import { recipePreviewOptions, type RecipePreviewContext } from '../lib/builderPreview'
 import { UmfSection } from './UmfSection'
 
 interface Props {
@@ -12,6 +14,8 @@ interface Props {
 }
 
 type ExportFormat = 'json' | 'csv'
+
+const THUMB_SIZE = 96
 
 const SCHEDULE_LENGTHS: Array<{ value: ScheduleLength; label: string; hint: string }> = [
   { value: 'very-short', label: 'Very short', hint: '~4 h to peak — small electric kilns, thin test tiles' },
@@ -22,6 +26,25 @@ const SCHEDULE_LENGTHS: Array<{ value: ScheduleLength; label: string; hint: stri
 
 function formatScheduleTime(schedule: FiringSchedule) {
   return `~${schedule.estimatedHours} h total (${schedule.heatingHours} h heat / ${schedule.coolingHours} h cool)`
+}
+
+/** Small tile of what the recipe's own chemistry predicts, as distinct from the colour that was asked for. */
+function RecipeThumb({ recipe, context }: { recipe: RecipeSuggestion; context: RecipePreviewContext }) {
+  const options = useMemo(() => recipePreviewOptions(recipe, context), [recipe, context])
+  const src = useMemo(() => renderGlazePreviewDataUrl(options, THUMB_SIZE * 2), [options])
+  if (!src) return null
+  return (
+    <figure
+      className="recipe-thumb"
+      title="Estimated from this recipe's ingredients — the same prediction the Recipe Builder shows"
+    >
+      <img src={src} alt={`Predicted appearance of ${recipe.name} from its chemistry`} width={THUMB_SIZE} height={THUMB_SIZE} />
+      <figcaption>
+        <span className="recipe-thumb__label">From chemistry</span>
+        <span className="recipe-thumb__hex">{options.color.toUpperCase()}</span>
+      </figcaption>
+    </figure>
+  )
 }
 
 function formatRate(rateC: number | null, rateF: number | null) {
@@ -146,6 +169,10 @@ export function RecipeResultsPanel({ composer }: Props) {
     scheduleFor,
   } = composer
   const [printPreview, setPrintPreview] = useState(false)
+  const previewContext = useMemo<RecipePreviewContext>(
+    () => ({ firingTempC: form.firingTempC, atmosphere: form.atmosphere }),
+    [form.firingTempC, form.atmosphere],
+  )
 
   return (
     <section className="panel results-panel">
@@ -193,17 +220,22 @@ export function RecipeResultsPanel({ composer }: Props) {
               const { base, colorants } = splitIngredients(recipe.ingredients)
               return (
               <article className="recipe-card" key={recipe.name}>
-                <div className="recipe-head">
-                  <h3>{recipe.name}</h3>
-                  <span>{recipe.firingRange}</span>
+                <div className="recipe-card__top">
+                  <div className="recipe-card__intro">
+                    <div className="recipe-head">
+                      <h3>{recipe.name}</h3>
+                      <span>{recipe.firingRange}</span>
+                    </div>
+                    {recipe.route && recipe.route.signature.length > 0 && (
+                      <p className="recipe-route">
+                        <span className="recipe-route-label">Colour from</span>{' '}
+                        {recipe.route.signature.join(' + ')}
+                      </p>
+                    )}
+                    <p>{recipe.rationale}</p>
+                  </div>
+                  <RecipeThumb recipe={recipe} context={previewContext} />
                 </div>
-                {recipe.route && recipe.route.signature.length > 0 && (
-                  <p className="recipe-route">
-                    <span className="recipe-route-label">Colour from</span>{' '}
-                    {recipe.route.signature.join(' + ')}
-                  </p>
-                )}
-                <p>{recipe.rationale}</p>
                 <IngredientGroup title="Base glaze" entries={base} />
                 <IngredientGroup title="Colorants & additives" entries={colorants} />
                 {recipe.umf && <UmfSection umf={recipe.umf} />}
