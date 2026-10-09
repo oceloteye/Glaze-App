@@ -28,6 +28,9 @@
 	</scm>
 	<properties>
 		<java.version>25</java.version>
+		<!-- Overridden by the ide-output profile so IDE-compiled classes never reach devtools' watched folder. -->
+		<classes.dir>classes</classes.dir>
+		<test-classes.dir>test-classes</test-classes.dir>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -63,6 +66,8 @@
 	</dependencies>
 
 	<build>
+		<outputDirectory>${project.build.directory}/${classes.dir}</outputDirectory>
+		<testOutputDirectory>${project.build.directory}/${test-classes.dir}</testOutputDirectory>
 		<plugins>
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
@@ -114,5 +119,22 @@
 			</plugin>
 		</plugins>
 	</build>
+
+	<profiles>
+		<!-- m2e (the VS Code / Eclipse Java tooling) sets m2e.version; keep its class output away from
+		     target/classes so devtools only restarts on real Maven builds and never loads IDE stubs. -->
+		<profile>
+			<id>ide-output</id>
+			<activation>
+				<property>
+					<name>m2e.version</name>
+				</property>
+			</activation>
+			<properties>
+				<classes.dir>ide-classes</classes.dir>
+				<test-classes.dir>ide-test-classes</test-classes.dir>
+			</properties>
+		</profile>
+	</profiles>
 
 </project>
