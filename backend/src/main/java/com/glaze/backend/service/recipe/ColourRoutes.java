@@ -173,20 +173,20 @@ public final class ColourRoutes {
         }
 
         // ── wine / burgundy-purple ─────────────────────────────────────────────
-        // June Perry Purple: chrome-tin in a lime-rich, low-alumina boron melt grows enough malayaite pigment
-        // to go wine and burgundy-purple where a stiffer clear only reaches pink. The base is the recipe.
+        // chrome-tin in a lime-rich, low-alumina boron melt grows enough malayaite pigment to go wine and
+        // burgundy-purple where a stiffer clear only reaches pink. The base is the recipe.
         if (!reduction && tempC >= 1180 && tempC <= 1250 && h >= 312 && h < 355 && s >= 0.3 && l >= 0.22 && l < 0.5) {
             double chrome = 0.22 + 0.2 * RecipeMath.clamp01((0.42 - l) / 0.2);
-            var junePerryBase = new LinkedHashMap<String, Double>();
-            junePerryBase.put(SILICA, 32.0);
-            junePerryBase.put(GERSTLEY_BORATE, 21.0);
-            junePerryBase.put(WHITING, 20.0);
-            junePerryBase.put(NEPHELINE_SYENITE, 16.0);
-            junePerryBase.put(EPK_KAOLIN, 11.0);
-            junePerryBase.put(BENTONITE, 2.0);
-            alternatives.add(new ColourRoute("June Perry Purple (chrome-tin wine)",
-                    "June Perry's cone 6 chrome-tin: 5% tin and a quarter percent of chrome in a lime-rich, low-alumina boron melt go wine to burgundy-purple where thick and break to lavender where thin. Magnesia and zinc would turn it grey, so none is allowed in.",
-                    List.of(TIN_OXIDE, CHROME_OXIDE), junePerryBase,
+            var wineBase = new LinkedHashMap<String, Double>();
+            wineBase.put(SILICA, 32.0);
+            wineBase.put(GERSTLEY_BORATE, 21.0);
+            wineBase.put(WHITING, 20.0);
+            wineBase.put(NEPHELINE_SYENITE, 16.0);
+            wineBase.put(EPK_KAOLIN, 11.0);
+            wineBase.put(BENTONITE, 2.0);
+            alternatives.add(new ColourRoute("Chrome-tin wine",
+                    "Cone 6 chrome-tin: 5% tin and a quarter percent of chrome in a lime-rich, low-alumina boron melt go wine to burgundy-purple where thick and break to lavender where thin. Magnesia and zinc would turn it grey, so none is allowed in.",
+                    List.of(TIN_OXIDE, CHROME_OXIDE), wineBase,
                     formula -> {
                         RecipeModifier.moveToLimeFlux(formula);
                         RecipeMath.adjust(formula, TIN_OXIDE, 5.0);
