@@ -334,6 +334,14 @@ public final class RecipeModifier {
             RecipeMath.adjust(formula, ZIRCOPAX, 9.0 * weight);
             return;
         }
+        if ((h >= 318 || h < 15) && l >= 0.22 && s >= 0.25) {
+            // chrome-tin: the only oxidation route to a clean pink, and in a lime melt it runs on through rose
+            // and raspberry to wine (June Perry Purple). The pigment needs calcium and is killed by magnesia or zinc.
+            moveToLimeFlux(formula);
+            RecipeMath.adjust(formula, TIN_OXIDE, 5.0 * weight);
+            RecipeMath.adjust(formula, CHROME_OXIDE, chromeTinDose(l) * weight);
+            return;
+        }
         boolean ironSaturate = warm && s >= 0.15 && s < 0.45 && l < 0.26;
         if (l < 0.2 || ironSaturate) {
             if (warm && s >= 0.15) {
@@ -370,12 +378,6 @@ public final class RecipeModifier {
             // pale blue: a trace of cobalt is all a clear needs; whiten only the very palest
             RecipeMath.adjust(formula, COBALT_CARBONATE, 0.45 * weight * RecipeMath.clamp01((0.85 - l) / 0.25) * (0.5 + s));
             RecipeMath.adjust(formula, ZIRCOPAX, 3.0 * weight * RecipeMath.clamp01((l - 0.7) / 0.15));
-            return;
-        }
-        if ((h >= 330 || h < 15) && l >= 0.3 && s >= 0.25) {
-            // chrome-tin: the only oxidation route to a clean pink; more chrome takes it through rose to maroon
-            RecipeMath.adjust(formula, TIN_OXIDE, 5.0 * weight);
-            RecipeMath.adjust(formula, CHROME_OXIDE, weight * (0.2 + 0.4 * RecipeMath.clamp01((0.7 - l) / 0.35)));
             return;
         }
         if (h >= 255 && s < 0.4 && l >= 0.3) {
@@ -491,6 +493,21 @@ public final class RecipeModifier {
     private static double blueDepth(double l) {
         double d = RecipeMath.clamp01((0.75 - l) / 0.4);
         return d * d;
+    }
+
+    /** Chrome against 5% tin: a trace for pink, climbing toward half a percent as the ask deepens to wine. */
+    static double chromeTinDose(double l) {
+        return 0.18 + 0.42 * RecipeMath.clamp01((0.6 - l) / 0.35);
+    }
+
+    /** Chrome-tin pink is a calcium pigment that magnesia and zinc suppress: trade them for whiting. */
+    static void moveToLimeFlux(Map<String, Double> formula) {
+        for (String killer : List.of(DOLOMITE, TALC, ZINC_OXIDE)) {
+            Double amount = formula.remove(killer);
+            if (amount != null) {
+                RecipeMath.adjust(formula, WHITING, amount);
+            }
+        }
     }
 
     /** Copper only goes turquoise in a soda/lithium melt: swap potash feldspar for nepheline syenite and the calcium frit for the soda frit. */

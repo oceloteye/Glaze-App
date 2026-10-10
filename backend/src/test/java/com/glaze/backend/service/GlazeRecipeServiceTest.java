@@ -447,18 +447,19 @@ class GlazeRecipeServiceTest {
     }
 
     @Test
-    void magentaTargetIsManganeseWithOnlyATraceOfCobalt() {
+    void magentaIsChromeTinWhileVioletStaysManganeseCobalt() {
         var violet = getBalanced(service.generateRecipes(
                 request("#6b248f", 1222, "Glossy", "Medium", List.of(), 50, null))).ingredients();
         var magenta = getBalanced(service.generateRecipes(
                 request("#8f246b", 1222, "Glossy", "Medium", List.of(), 50, null))).ingredients();
 
-        // the redder the purple, the more manganese and the less cobalt
-        assertThat(magenta.getOrDefault("Manganese Dioxide", 0.0))
-                .isGreaterThan(violet.getOrDefault("Manganese Dioxide", 0.0));
-        assertThat(magenta.getOrDefault("Cobalt Carbonate", 0.0))
-                .isLessThan(violet.getOrDefault("Cobalt Carbonate", 0.0));
-        assertThat(magenta).doesNotContainKey("Copper Carbonate");
+        // violet is cobalt pulled red by manganese; a saturated magenta is chrome-tin raspberry, not plum
+        assertThat(violet.getOrDefault("Manganese Dioxide", 0.0))
+                .isGreaterThan(violet.getOrDefault("Cobalt Carbonate", 0.0));
+        assertThat(violet.getOrDefault("Cobalt Carbonate", 0.0)).isGreaterThan(0.0);
+        assertThat(magenta.getOrDefault("Tin Oxide", 0.0)).isGreaterThan(2.0);
+        assertThat(magenta.getOrDefault("Chrome Oxide", 0.0)).isBetween(0.2, 1.0);
+        assertThat(magenta).doesNotContainKeys("Manganese Dioxide", "Copper Carbonate");
     }
 
     @Test
@@ -469,6 +470,40 @@ class GlazeRecipeServiceTest {
         assertThat(balanced.getOrDefault("Tin Oxide", 0.0)).isGreaterThan(2.0);
         assertThat(balanced.getOrDefault("Chrome Oxide", 0.0)).isBetween(0.2, 1.0);
         assertThat(balanced.getOrDefault("Red Iron Oxide", 0.0)).isLessThan(2.0);
+    }
+
+    @Test
+    void chromeTinAsksSwapMagnesiaForLimeSoThePinkCanForm() {
+        // the satin base carries dolomite; chrome-tin pink is a calcium pigment that magnesia suppresses
+        var wine = getBalanced(service.generateRecipes(
+                request("#6e2a4a", 1222, "Satin", "Medium", List.of(), 50, null))).ingredients();
+
+        assertThat(wine.getOrDefault("Tin Oxide", 0.0)).isGreaterThan(2.0);
+        assertThat(wine.getOrDefault("Chrome Oxide", 0.0)).isBetween(0.3, 0.7);
+        assertThat(wine).doesNotContainKeys("Dolomite", "Talc", "Zinc Oxide", "Red Iron Oxide");
+        assertThat(wine.getOrDefault("Whiting", 0.0)).isGreaterThan(14.0);
+    }
+
+    @Test
+    void junePerryPurpleLeadsBurgundyPurpleAsksAtCone6() {
+        var recipes = service.generateRecipes(request("#6e2a4a", 1222, "Satin", "Medium", List.of(), 50, null));
+        var lead = recipes.get(0);
+
+        assertThat(lead.route().name()).startsWith("June Perry Purple");
+        assertThat(lead.route().signature()).containsExactlyInAnyOrder("Tin Oxide", "Chrome Oxide");
+        var ingredients = lead.ingredients();
+        assertThat(ingredients.getOrDefault("Gerstley Borate", 0.0)).isGreaterThan(15.0);
+        assertThat(ingredients.getOrDefault("Whiting", 0.0)).isGreaterThan(15.0);
+        assertThat(ingredients.getOrDefault("Nepheline Syenite", 0.0)).isGreaterThan(10.0);
+        assertThat(ingredients.getOrDefault("Tin Oxide", 0.0)).isBetween(3.5, 5.5);
+        assertThat(ingredients.getOrDefault("Chrome Oxide", 0.0)).isBetween(0.18, 0.45);
+        assertThat(ingredients).doesNotContainKeys("Dolomite", "Talc", "Zinc Oxide", "Manganese Dioxide", "Cobalt Carbonate");
+
+        // a true violet is not a June Perry colour, and neither is a high-fire or reduction ask
+        assertThat(service.generateRecipes(request("#6b248f", 1222, "Satin", "Medium", List.of(), 50, null)))
+                .noneMatch(r -> r.route().name().startsWith("June Perry"));
+        assertThat(service.generateRecipes(request("#6e2a4a", 1285, "Satin", "Medium", List.of(), 50, null)))
+                .noneMatch(r -> r.route().name().startsWith("June Perry"));
     }
 
     @Test
