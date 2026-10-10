@@ -46,12 +46,11 @@ public final class RecipeModifier {
     private static final String CHARACTER_VIBRANT = RecipeVariants.VIBRANT;
     private static final String ATMOSPHERE_OXIDATION = "oxidation";
     private static final String ATMOSPHERE_REDUCTION = "reduction";
-    private static final double PURPLE_MID_HIGH_MAX_MANGANESE = 1.35;
+    private static final double PURPLE_MID_HIGH_MAX_MANGANESE = 4.5;
     private static final double PURPLE_MID_HIGH_MAX_IRON_OXIDE = 0.55;
     private static final double PURPLE_MID_HIGH_MAX_RED_IRON = 0.65;
     private static final double PURPLE_MID_HIGH_MAX_YELLOW_IRON = 0.2;
     private static final double PURPLE_MID_HIGH_MAX_RUTILE = 1.7;
-    private static final double PURPLE_MID_HIGH_MIN_COBALT = 0.8;
 
     private RecipeModifier() {
     }
@@ -215,9 +214,10 @@ public final class RecipeModifier {
         double[] hsl = RecipeColorUtil.hexToHsl(hex);
         double h = hsl[0], s = hsl[1], l = hsl[2];
         boolean reduction = ATMOSPHERE_REDUCTION.equals(atmosphere);
-        boolean redHue = h < 30 || h >= 330;
+        // iron saturates fire rust, not crimson: wine/magenta asks are chrome-tin territory
+        boolean rustHue = h < 25 || h >= 352;
 
-        if (!reduction && redHue && s >= 0.45 && l >= 0.2 && l <= 0.45 && tempC >= 1150 && tempC <= 1260) {
+        if (!reduction && rustHue && s >= 0.45 && l >= 0.2 && l <= 0.45 && tempC >= 1150 && tempC <= 1260) {
             // Randy's Red family: iron-saturated boron/talc melt that recrystallises to rust on cooling
             return new Archetype("Iron-saturate red (Randy's Red)", Map.of(GERSTLEY_BORATE, 32.0, SILICA, 30.0,
                     POTASH_FELDSPAR, 20.0, TALC, 14.0, EPK_KAOLIN, 5.0, RED_IRON_OXIDE, 15.0, BENTONITE, 2.0));
@@ -372,16 +372,16 @@ public final class RecipeModifier {
             RecipeMath.adjust(formula, ZIRCOPAX, 3.0 * weight * RecipeMath.clamp01((l - 0.7) / 0.15));
             return;
         }
-        if ((h >= 330 || h < 15) && l >= 0.6 && s >= 0.3 && s <= 0.6) {
-            // chrome-tin pink
+        if ((h >= 330 || h < 15) && l >= 0.3 && s >= 0.25) {
+            // chrome-tin: the only oxidation route to a clean pink; more chrome takes it through rose to maroon
             RecipeMath.adjust(formula, TIN_OXIDE, 5.0 * weight);
-            RecipeMath.adjust(formula, CHROME_OXIDE, 0.25 * weight);
+            RecipeMath.adjust(formula, CHROME_OXIDE, weight * (0.2 + 0.4 * RecipeMath.clamp01((0.7 - l) / 0.35)));
             return;
         }
         if (h >= 255 && s < 0.4 && l >= 0.3) {
             // manganese plum, pushed toward violet by a cobalt trace as the ask gets bluer
             RecipeMath.adjust(formula, MANGANESE_DIOXIDE, 4.0 * weight * chromaFactor + 2.5 * weight * darkFactor);
-            RecipeMath.adjust(formula, COBALT_CARBONATE, 0.35 * weight * RecipeMath.clamp01((300.0 - h) / 40.0));
+            RecipeMath.adjust(formula, COBALT_CARBONATE, 0.5 * weight * RecipeMath.clamp01((320.0 - h) / 60.0));
             RecipeMath.adjust(formula, RED_IRON_OXIDE, 0.5 * weight);
             return;
         }
@@ -420,7 +420,7 @@ public final class RecipeModifier {
             } else if (s >= 0.25) {
                 moveToAlkalineFlux(formula);
             }
-        } else if (h < 260) {
+        } else if (h < 250) {
             if (l < 0.30) {
                 RecipeMath.adjust(formula, COBALT_CARBONATE, 1.45 * weight * chromaFactor * satScale);
                 RecipeMath.adjust(formula, MANGANESE_DIOXIDE, 0.9 * weight * (0.6 + darkFactor));
@@ -430,22 +430,22 @@ public final class RecipeModifier {
                 RecipeMath.adjust(formula, COPPER_CARBONATE, 0.55 * weight * (0.4 + 0.6 * s));
                 RecipeMath.adjust(formula, ZIRCOPAX, 2.6 * weight * lightFactor);
             } else {
-                RecipeMath.adjust(formula, COBALT_CARBONATE, 1.2 * weight * chromaFactor * satScale);
+                // cobalt is strong enough that the dose has to fall away quickly as the ask lightens
+                double blueDepth = RecipeMath.clamp01((0.75 - l) / 0.4);
+                RecipeMath.adjust(formula, COBALT_CARBONATE, 1.2 * weight * chromaFactor * satScale * blueDepth);
                 RecipeMath.adjust(formula, COPPER_CARBONATE, 0.25 * weight * (0.4 + 0.6 * s));
             }
             // low-saturation blues are rutile blues: titania breaks the cobalt into a milky slate
             RecipeMath.adjust(formula, RUTILE, 2.5 * weight * RecipeMath.clamp01((0.28 - s) / 0.12));
         } else {
-            if (purpleZone) {
-                double tempBias = (tempC - 1000.0) / 220.0;
-                double manganeseBoost = 1.0 + Math.max(0.0, tempBias) * 1.4;
-                RecipeMath.adjust(formula, MANGANESE_DIOXIDE, 2.4 * weight * (0.7 + 0.7 * s) * chromaFactor * manganeseBoost);
-                RecipeMath.adjust(formula, COPPER_CARBONATE, 1.25 * weight * (0.45 + 0.8 * s) * chromaFactor);
-                RecipeMath.adjust(formula, COBALT_CARBONATE, 0.82 * weight * (0.45 + 0.55 * s) * chromaFactor);
-            } else {
-                RecipeMath.adjust(formula, MANGANESE_DIOXIDE, 1.95 * weight * (0.6 + 0.6 * s) * chromaFactor);
-                RecipeMath.adjust(formula, COBALT_CARBONATE, 0.95 * weight * (0.7 + 0.7 * s) * chromaFactor);
-            }
+            // violet is cobalt pulled red by manganese; magenta is manganese with only a trace of cobalt.
+            // Copper has no place here (it greens the mix), and a light ask gets a fraction of the dose.
+            double blueness = RecipeMath.clamp01((330.0 - h) / 70.0);
+            double purpleDepth = RecipeMath.clamp01((0.8 - l) / 0.45);
+            RecipeMath.adjust(formula, MANGANESE_DIOXIDE,
+                    weight * chromaFactor * purpleDepth * (1.6 + 2.6 * (1.0 - blueness)));
+            RecipeMath.adjust(formula, COBALT_CARBONATE,
+                    weight * chromaFactor * purpleDepth * (0.1 + 0.55 * blueness * blueness));
         }
 
         if (darkFactor > 0.0) {
@@ -505,7 +505,7 @@ public final class RecipeModifier {
         boolean reduction = ATMOSPHERE_REDUCTION.equals(atmosphere);
         double depth = RecipeMath.clamp01((0.9 - l) / 0.5);
 
-        if (h < 60) {
+        if (h < 60 || h >= 330) {
             RecipeMath.adjust(formula, RED_IRON_OXIDE, 0.55 * weight * (0.5 + 0.8 * s) * zoneFactor * depth);
             RecipeMath.adjust(formula, RUTILE, 0.85 * weight * (0.5 + 0.9 * s) * zoneFactor * depth);
             RecipeMath.adjust(formula, YELLOW_IRON_OXIDE, 0.35 * weight * chromaFactor * zoneFactor * depth);
@@ -521,19 +521,20 @@ public final class RecipeModifier {
             RecipeMath.adjust(formula, COPPER_CARBONATE, 0.55 * weight * chromaFactor * zoneFactor);
             RecipeMath.adjust(formula, COBALT_CARBONATE, 0.45 * weight * (0.4 + 0.8 * s) * zoneFactor * (h >= 200 ? 1.0 : 0.0));
             RecipeMath.adjust(formula, ZIRCOPAX, 0.55 * weight * lightFactor * zoneFactor);
-        } else if (h < 260) {
-            RecipeMath.adjust(formula, COBALT_CARBONATE, 0.55 * weight * chromaFactor * zoneFactor * cobaltSatScale(s));
+        } else if (h < 250) {
+            double blueDepth = RecipeMath.clamp01((0.75 - l) / 0.4);
+            RecipeMath.adjust(formula, COBALT_CARBONATE, 0.55 * weight * chromaFactor * zoneFactor * cobaltSatScale(s) * blueDepth);
             RecipeMath.adjust(formula, MANGANESE_DIOXIDE, 0.25 * weight * (0.4 + darkFactor + 0.7 * s) * zoneFactor);
             RecipeMath.adjust(formula, COPPER_CARBONATE, 0.2 * weight * (0.4 + 0.8 * s) * zoneFactor);
         } else {
-            RecipeMath.adjust(formula, MANGANESE_DIOXIDE, 0.7 * weight * (0.5 + 0.9 * s) * zoneFactor);
-            RecipeMath.adjust(formula, COPPER_CARBONATE, 0.35 * weight * (0.5 + 0.8 * s) * zoneFactor);
-            RecipeMath.adjust(formula, COBALT_CARBONATE, 0.18 * weight * (0.3 + 0.7 * s) * zoneFactor);
+            double blueness = RecipeMath.clamp01((330.0 - h) / 70.0);
+            RecipeMath.adjust(formula, MANGANESE_DIOXIDE, 0.6 * weight * (0.5 + 0.9 * s) * zoneFactor);
+            RecipeMath.adjust(formula, COBALT_CARBONATE, 0.12 * weight * (0.3 + 0.7 * s) * zoneFactor * blueness);
         }
 
-        // manganese and cobalt only deepen cool hues; on warm asks they just muddy the colour
-        boolean cool = h >= 200 && h < 330;
-        double coolDepth = cool ? (1.0 - lightFactor) : 0.0;
+        // manganese and cobalt only deepen blues; purples dose their own depth and warm asks would just muddy
+        boolean cool = h >= 200 && h < 250;
+        double coolDepth = cool ? RecipeMath.clamp01((0.75 - l) / 0.4) : 0.0;
         if (tempC < 1000) {
             RecipeMath.adjust(formula, ZIRCOPAX, 0.45 * weight * lightFactor);
             RecipeMath.adjust(formula, COBALT_CARBONATE, 0.15 * weight * chromaFactor * coolDepth);
@@ -574,7 +575,6 @@ public final class RecipeModifier {
         double redIronCap = oxidation ? PURPLE_MID_HIGH_MAX_RED_IRON : 1.0;
         double yellowIronCap = oxidation ? PURPLE_MID_HIGH_MAX_YELLOW_IRON : 0.35;
         double rutileCap = oxidation ? PURPLE_MID_HIGH_MAX_RUTILE : 2.2;
-        double cobaltMin = oxidation ? PURPLE_MID_HIGH_MIN_COBALT : 0.55;
 
         capIngredient(formula, MANGANESE_DIOXIDE, manganeseCap);
         capIngredient(formula, IRON_OXIDE, ironOxideCap);
@@ -582,16 +582,6 @@ public final class RecipeModifier {
         capIngredient(formula, YELLOW_IRON_OXIDE, yellowIronCap);
         if (!CHARACTER_EARTHY.equals(colorCharacter)) {
             capIngredient(formula, RUTILE, rutileCap);
-        }
-
-        double cobalt = formula.getOrDefault(COBALT_CARBONATE, 0.0);
-        if (cobalt < cobaltMin) {
-            RecipeMath.adjust(formula, COBALT_CARBONATE, cobaltMin - cobalt);
-        }
-        if (oxidation) {
-            RecipeMath.adjust(formula, ZIRCOPAX, 0.6);
-        } else {
-            RecipeMath.adjust(formula, ZIRCOPAX, 0.2);
         }
     }
 
@@ -603,7 +593,7 @@ public final class RecipeModifier {
     }
 
     private static boolean isPurpleZone(double hue) {
-        return hue >= 260.0 && hue < 330.0;
+        return hue >= 250.0 && hue < 330.0;
     }
 
     private static boolean isMidHighFirePurple(double hue, int tempC) {
