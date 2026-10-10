@@ -452,6 +452,8 @@ public final class RecipeModifier {
                     weight * chromaFactor * purpleDepth * (1.6 + 2.6 * (1.0 - blueness)));
             RecipeMath.adjust(formula, COBALT_CARBONATE,
                     weight * chromaFactor * purpleDepth * (0.1 + 0.55 * blueness * blueness));
+            // a few percent of manganese opacifies on its own; zircon on top only pastels a saturated purple
+            RecipeMath.adjustIfPresent(formula, ZIRCOPAX, -4.0 * weight * purpleDepth * RecipeMath.clamp01((s - 0.35) / 0.3));
         }
 
         if (darkFactor > 0.0) {

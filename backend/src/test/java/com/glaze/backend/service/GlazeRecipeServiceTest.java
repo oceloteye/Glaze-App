@@ -472,6 +472,18 @@ class GlazeRecipeServiceTest {
     }
 
     @Test
+    void saturatedPurpleTrimsSemiOpaqueZirconThatWouldPastelIt() {
+        var purple = getBalanced(service.generateRecipes(
+                request("#8f2291", 1222, "Satin", "Medium", List.of(), 50, null))).ingredients();
+        var dusty = getBalanced(service.generateRecipes(
+                request("#7e5095", 1222, "Satin", "Medium", List.of(), 50, null))).ingredients();
+
+        assertThat(purple.getOrDefault("Zircopax", 0.0)).isLessThan(2.5);
+        assertThat(purple.getOrDefault("Manganese Dioxide", 0.0)).isGreaterThan(3.0);
+        assertThat(dusty.getOrDefault("Zircopax", 0.0)).isGreaterThan(purple.getOrDefault("Zircopax", 0.0));
+    }
+
+    @Test
     void deepTealGetsMoreCopperThanLightTurquoisePlusATraceDeepener() {
         var deep = getBalanced(service.generateRecipes(
                 request("#248f8f", 1222, "Glossy", "Medium", List.of(), 50, null))).ingredients();
