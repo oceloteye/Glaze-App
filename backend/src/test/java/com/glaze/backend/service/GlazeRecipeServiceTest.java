@@ -471,6 +471,29 @@ class GlazeRecipeServiceTest {
         assertThat(balanced.getOrDefault("Red Iron Oxide", 0.0)).isLessThan(2.0);
     }
 
+    @Test
+    void deepTealGetsMoreCopperThanLightTurquoisePlusATraceDeepener() {
+        var deep = getBalanced(service.generateRecipes(
+                request("#248f8f", 1222, "Glossy", "Medium", List.of(), 50, null))).ingredients();
+        var light = getBalanced(service.generateRecipes(
+                request("#47d1d1", 1222, "Glossy", "Medium", List.of(), 50, null))).ingredients();
+
+        assertThat(deep.getOrDefault("Copper Carbonate", 0.0))
+                .isGreaterThan(light.getOrDefault("Copper Carbonate", 0.0));
+        assertThat(deep.getOrDefault("Chrome Oxide", 0.0) + deep.getOrDefault("Cobalt Carbonate", 0.0))
+                .isBetween(0.1, 0.8);
+        assertThat(light).doesNotContainKeys("Chrome Oxide", "Cobalt Carbonate");
+    }
+
+    @Test
+    void lightCeruleanIsNotOverdosedWithCobalt() {
+        var balanced = getBalanced(service.generateRecipes(
+                request("#47a3d1", 1222, "Glossy", "Medium", List.of(), 50, null))).ingredients();
+
+        assertThat(balanced.getOrDefault("Copper Carbonate", 0.0)).isBetween(1.5, 3.0);
+        assertThat(balanced.getOrDefault("Cobalt Carbonate", 0.0)).isBetween(0.1, 0.5);
+    }
+
     // ── Intensity scaling ─────────────────────────────────────────────────────
 
     @Test

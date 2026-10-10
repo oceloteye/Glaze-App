@@ -115,7 +115,11 @@ export function predictGlazeColor(recipe: Record<string, number>, reduction: boo
       pct(recipe, ['Nepheline Syenite', 'Soda Feldspar', 'Lithium Carbonate', 'Barium Carbonate']) +
         (recipe['Ferro Frit 3134'] ?? 0) * 0.5 >
       25
-    const green: Rgb = alkaline ? [72, 170, 165] : [62, 134, 78]
+    // past ~2% copper the colour keeps deepening before it finally goes metallic black
+    const heavy = clamp01((copper - 2) / 2.5)
+    const green: Rgb = alkaline
+      ? lerp([72, 170, 165], [34, 118, 116], heavy)
+      : lerp([62, 134, 78], [40, 98, 58], heavy)
     if (reduction) {
       // copper red only forms from a trace; a few percent stays green (oribe) even in reduction
       const red = clamp01((1.6 - copper) / 0.8)
