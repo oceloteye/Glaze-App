@@ -399,8 +399,8 @@ class GlazeRecipeServiceTest {
         assertThat(none).isEqualTo(semi);
     }
 
-        @Test
-        void cone6PurpleVariegatedAvoidsOverdarkColorantLoad() {
+    @Test
+    void cone6PurpleVariegatedAvoidsOverdarkColorantLoad() {
         var recipes = service.generateRecipes(
             request("#6f42c1", 1230, "Satin", "Medium", List.of("Variegated"), 100, null));
         var balanced = getBalanced(recipes).ingredients();
@@ -411,10 +411,12 @@ class GlazeRecipeServiceTest {
             + balanced.getOrDefault("Yellow Iron Oxide", 0.0);
         double cobalt = balanced.getOrDefault("Cobalt Carbonate", 0.0);
 
-        assertThat(manganese).isLessThanOrEqualTo(1.5);
+        // a mid-lightness violet: manganese carries the colour, cobalt pulls it blue, iron stays a trace
+        assertThat(manganese).isBetween(1.0, 4.5);
         assertThat(ironLoad).isLessThanOrEqualTo(1.5);
-        assertThat(cobalt).isGreaterThanOrEqualTo(0.65);
-        }
+        assertThat(cobalt).isGreaterThan(0.0);
+        assertThat(cobalt).isLessThan(manganese);
+    }
 
     @Test
     void purpleTargetPrefersVioletColorantsOverBlueCobaltBias() {
@@ -426,23 +428,47 @@ class GlazeRecipeServiceTest {
         double cobalt = balanced.getOrDefault("Cobalt Carbonate", 0.0);
         double copper = balanced.getOrDefault("Copper Carbonate", 0.0);
 
+        // copper greens a violet; the purple route is manganese plus a cobalt trace only
         assertThat(manganese).isGreaterThan(cobalt);
-        assertThat(copper).isGreaterThan(0.0);
+        assertThat(cobalt).isGreaterThan(0.0);
+        assertThat(copper).isZero();
     }
 
     @Test
     void midHighPurpleFiringStaysBalancedWithoutBlueCobaltDrift() {
-        var recipes = service.generateRecipes(request("#843adf", 1222, "Satin", "High", List.of(), 50, null));
-        var balanced = getBalanced(recipes).ingredients();
+        var balanced = getBalanced(service.generateRecipes(
+                request("#843adf", 1222, "Satin", "High", List.of(), 50, null))).ingredients();
 
         double manganese = balanced.getOrDefault("Manganese Dioxide", 0.0);
         double cobalt = balanced.getOrDefault("Cobalt Carbonate", 0.0);
-        double copper = balanced.getOrDefault("Copper Carbonate", 0.0);
 
-        assertThat(manganese).isGreaterThan(0.75);
-        assertThat(manganese).isLessThanOrEqualTo(1.35);
-        assertThat(cobalt).isGreaterThanOrEqualTo(0.8);
-        assertThat(copper).isGreaterThan(0.0);
+        assertThat(manganese).isBetween(1.0, 4.5);
+        assertThat(cobalt).isBetween(0.1, 1.0);
+    }
+
+    @Test
+    void magentaTargetIsManganeseWithOnlyATraceOfCobalt() {
+        var violet = getBalanced(service.generateRecipes(
+                request("#6b248f", 1222, "Glossy", "Medium", List.of(), 50, null))).ingredients();
+        var magenta = getBalanced(service.generateRecipes(
+                request("#8f246b", 1222, "Glossy", "Medium", List.of(), 50, null))).ingredients();
+
+        // the redder the purple, the more manganese and the less cobalt
+        assertThat(magenta.getOrDefault("Manganese Dioxide", 0.0))
+                .isGreaterThan(violet.getOrDefault("Manganese Dioxide", 0.0));
+        assertThat(magenta.getOrDefault("Cobalt Carbonate", 0.0))
+                .isLessThan(violet.getOrDefault("Cobalt Carbonate", 0.0));
+        assertThat(magenta).doesNotContainKey("Copper Carbonate");
+    }
+
+    @Test
+    void wineRedTargetRoutesToChromeTinNotIronSaturate() {
+        var balanced = getBalanced(service.generateRecipes(
+                request("#8f2447", 1222, "Glossy", "Medium", List.of(), 50, null))).ingredients();
+
+        assertThat(balanced.getOrDefault("Tin Oxide", 0.0)).isGreaterThan(2.0);
+        assertThat(balanced.getOrDefault("Chrome Oxide", 0.0)).isBetween(0.2, 1.0);
+        assertThat(balanced.getOrDefault("Red Iron Oxide", 0.0)).isLessThan(2.0);
     }
 
     // ── Intensity scaling ─────────────────────────────────────────────────────
