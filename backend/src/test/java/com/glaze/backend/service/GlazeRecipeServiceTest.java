@@ -485,11 +485,11 @@ class GlazeRecipeServiceTest {
     }
 
     @Test
-    void junePerryPurpleLeadsBurgundyPurpleAsksAtCone6() {
+    void chromeTinWineLeadsBurgundyPurpleAsksAtCone6() {
         var recipes = service.generateRecipes(request("#6e2a4a", 1222, "Satin", "Medium", List.of(), 50, null));
         var lead = recipes.get(0);
 
-        assertThat(lead.route().name()).startsWith("June Perry Purple");
+        assertThat(lead.route().name()).isEqualTo("Chrome-tin wine");
         assertThat(lead.route().signature()).containsExactlyInAnyOrder("Tin Oxide", "Chrome Oxide");
         var ingredients = lead.ingredients();
         assertThat(ingredients.getOrDefault("Gerstley Borate", 0.0)).isGreaterThan(15.0);
@@ -499,11 +499,11 @@ class GlazeRecipeServiceTest {
         assertThat(ingredients.getOrDefault("Chrome Oxide", 0.0)).isBetween(0.18, 0.45);
         assertThat(ingredients).doesNotContainKeys("Dolomite", "Talc", "Zinc Oxide", "Manganese Dioxide", "Cobalt Carbonate");
 
-        // a true violet is not a June Perry colour, and neither is a high-fire or reduction ask
+        // a true violet is not a chrome-tin wine colour, and neither is a high-fire or reduction ask
         assertThat(service.generateRecipes(request("#6b248f", 1222, "Satin", "Medium", List.of(), 50, null)))
-                .noneMatch(r -> r.route().name().startsWith("June Perry"));
+                .noneMatch(r -> r.route().name().equals("Chrome-tin wine"));
         assertThat(service.generateRecipes(request("#6e2a4a", 1285, "Satin", "Medium", List.of(), 50, null)))
-                .noneMatch(r -> r.route().name().startsWith("June Perry"));
+                .noneMatch(r -> r.route().name().equals("Chrome-tin wine"));
     }
 
     @Test

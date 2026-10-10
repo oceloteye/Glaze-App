@@ -218,8 +218,8 @@ public final class RecipeModifier {
         boolean rustHue = h < 25 || h >= 352;
 
         if (!reduction && rustHue && s >= 0.45 && l >= 0.2 && l <= 0.45 && tempC >= 1150 && tempC <= 1260) {
-            // Randy's Red family: iron-saturated boron/talc melt that recrystallises to rust on cooling
-            return new Archetype("Iron-saturate red (Randy's Red)", Map.of(GERSTLEY_BORATE, 32.0, SILICA, 30.0,
+            // iron-saturated boron/talc melt that recrystallises to rust on cooling
+            return new Archetype("Iron-saturate red", Map.of(GERSTLEY_BORATE, 32.0, SILICA, 30.0,
                     POTASH_FELDSPAR, 20.0, TALC, 14.0, EPK_KAOLIN, 5.0, RED_IRON_OXIDE, 15.0, BENTONITE, 2.0));
         }
         if (reduction && tempC >= 1250) {
