@@ -395,29 +395,35 @@ public final class RecipeModifier {
         } else if (h < 80) {
             RecipeMath.adjust(formula, RUTILE, 5.5 * weight * (0.7 + 0.6 * s));
             RecipeMath.adjust(formula, YELLOW_IRON_OXIDE, 2.0 * weight * chromaFactor);
-        } else if (h < 180) {
+        } else if (h < 150) {
             if (h < 105) {
                 RecipeMath.adjust(formula, COPPER_CARBONATE, 2.8 * weight * chromaFactor * depth);
                 RecipeMath.adjust(formula, YELLOW_IRON_OXIDE, 1.4 * weight * (0.6 + 0.8 * s));
                 RecipeMath.adjust(formula, RUTILE, 0.9 * weight * (0.6 + darkFactor));
                 RecipeMath.adjust(formula, RED_IRON_OXIDE, 0.8 * weight * darkFactor);
-            } else if (h < 150) {
+            } else {
                 RecipeMath.adjust(formula, COPPER_CARBONATE, 3.6 * weight * chromaFactor * depth);
                 RecipeMath.adjust(formula, YELLOW_IRON_OXIDE, 0.5 * weight * (0.5 + 0.8 * s));
                 RecipeMath.adjust(formula, RED_IRON_OXIDE, 0.5 * weight * darkFactor);
-            } else {
-                // turquoise: copper in an alkaline melt, no cobalt
-                RecipeMath.adjust(formula, COPPER_CARBONATE, 2.6 * weight * chromaFactor);
-                RecipeMath.adjust(formula, ZIRCOPAX, 1.8 * weight * lightFactor);
-                if (s >= 0.25) {
-                    moveToAlkalineFlux(formula);
-                }
+            }
+        } else if (h < 200) {
+            // turquoise: copper in an alkaline melt. A deep teal needs more copper plus a trace of
+            // chrome (green side) or cobalt (blue side); cobalt alone would just turn it blue.
+            double teal = RecipeMath.clamp01((0.5 - l) / 0.2);
+            double towardBlue = RecipeMath.clamp01((h - 160.0) / 30.0);
+            RecipeMath.adjust(formula, COPPER_CARBONATE, 2.6 * weight * chromaFactor * (1.0 + 0.6 * teal));
+            RecipeMath.adjust(formula, CHROME_OXIDE, 0.6 * weight * teal * (1.0 - towardBlue));
+            RecipeMath.adjust(formula, COBALT_CARBONATE, 0.45 * weight * teal * towardBlue);
+            RecipeMath.adjust(formula, ZIRCOPAX, 1.8 * weight * lightFactor);
+            if (s >= 0.25) {
+                moveToAlkalineFlux(formula);
             }
         } else if (h < 220) {
-            RecipeMath.adjust(formula, COPPER_CARBONATE, 2.5 * weight * chromaFactor);
-            if (h >= 200) {
-                RecipeMath.adjust(formula, COBALT_CARBONATE, 0.4 * weight * (0.7 + 0.7 * s) * satScale);
-            } else if (s >= 0.25) {
+            // cerulean: turquoise copper with a cobalt trace, both falling away as the ask lightens
+            double blueDepth = RecipeMath.clamp01((0.8 - l) / 0.45);
+            RecipeMath.adjust(formula, COPPER_CARBONATE, 2.5 * weight * chromaFactor * (0.4 + 0.6 * blueDepth));
+            RecipeMath.adjust(formula, COBALT_CARBONATE, 0.3 * weight * (0.5 + 0.7 * s) * satScale * blueDepth);
+            if (s >= 0.25) {
                 moveToAlkalineFlux(formula);
             }
         } else if (h < 250) {
@@ -431,7 +437,7 @@ public final class RecipeModifier {
                 RecipeMath.adjust(formula, ZIRCOPAX, 2.6 * weight * lightFactor);
             } else {
                 // cobalt is strong enough that the dose has to fall away quickly as the ask lightens
-                double blueDepth = RecipeMath.clamp01((0.75 - l) / 0.4);
+                double blueDepth = blueDepth(l);
                 RecipeMath.adjust(formula, COBALT_CARBONATE, 1.2 * weight * chromaFactor * satScale * blueDepth);
                 RecipeMath.adjust(formula, COPPER_CARBONATE, 0.25 * weight * (0.4 + 0.6 * s));
             }
@@ -479,6 +485,12 @@ public final class RecipeModifier {
         return RecipeMath.clamp01((s - 0.06) / 0.34);
     }
 
+    /** Cobalt dose scale for lightness: full from l≈0.35, falling steeply so a 1% dose is never asked for a sky blue. */
+    private static double blueDepth(double l) {
+        double d = RecipeMath.clamp01((0.75 - l) / 0.4);
+        return d * d;
+    }
+
     /** Copper only goes turquoise in a soda/lithium melt: swap potash feldspar for nepheline syenite and the calcium frit for the soda frit. */
     private static void moveToAlkalineFlux(Map<String, Double> formula) {
         Double potash = formula.remove(POTASH_FELDSPAR);
@@ -513,16 +525,17 @@ public final class RecipeModifier {
             RecipeMath.adjust(formula, YELLOW_IRON_OXIDE, 0.65 * weight * chromaFactor * zoneFactor);
             RecipeMath.adjust(formula, RUTILE, 0.7 * weight * (0.55 + 0.8 * s) * zoneFactor);
             RecipeMath.adjust(formula, COPPER_CARBONATE, 0.2 * weight * (0.3 + 0.6 * s) * zoneFactor);
-        } else if (h < 180) {
+        } else if (h < 200) {
             RecipeMath.adjust(formula, COPPER_CARBONATE, 0.75 * weight * chromaFactor * zoneFactor);
             RecipeMath.adjust(formula, YELLOW_IRON_OXIDE, 0.4 * weight * (0.5 + 0.7 * s) * zoneFactor * (h < 150 ? 1.0 : 0.0));
             RecipeMath.adjust(formula, ZIRCOPAX, 0.35 * weight * lightFactor * zoneFactor);
         } else if (h < 220) {
-            RecipeMath.adjust(formula, COPPER_CARBONATE, 0.55 * weight * chromaFactor * zoneFactor);
-            RecipeMath.adjust(formula, COBALT_CARBONATE, 0.45 * weight * (0.4 + 0.8 * s) * zoneFactor * (h >= 200 ? 1.0 : 0.0));
+            double blueDepth = RecipeMath.clamp01((0.8 - l) / 0.45);
+            RecipeMath.adjust(formula, COPPER_CARBONATE, 0.55 * weight * chromaFactor * zoneFactor * (0.4 + 0.6 * blueDepth));
+            RecipeMath.adjust(formula, COBALT_CARBONATE, 0.15 * weight * (0.4 + 0.8 * s) * zoneFactor * blueDepth);
             RecipeMath.adjust(formula, ZIRCOPAX, 0.55 * weight * lightFactor * zoneFactor);
         } else if (h < 250) {
-            double blueDepth = RecipeMath.clamp01((0.75 - l) / 0.4);
+            double blueDepth = blueDepth(l);
             RecipeMath.adjust(formula, COBALT_CARBONATE, 0.55 * weight * chromaFactor * zoneFactor * cobaltSatScale(s) * blueDepth);
             RecipeMath.adjust(formula, MANGANESE_DIOXIDE, 0.25 * weight * (0.4 + darkFactor + 0.7 * s) * zoneFactor);
             RecipeMath.adjust(formula, COPPER_CARBONATE, 0.2 * weight * (0.4 + 0.8 * s) * zoneFactor);
@@ -534,7 +547,7 @@ public final class RecipeModifier {
 
         // manganese and cobalt only deepen blues; purples dose their own depth and warm asks would just muddy
         boolean cool = h >= 200 && h < 250;
-        double coolDepth = cool ? RecipeMath.clamp01((0.75 - l) / 0.4) : 0.0;
+        double coolDepth = cool ? blueDepth(l) : 0.0;
         if (tempC < 1000) {
             RecipeMath.adjust(formula, ZIRCOPAX, 0.45 * weight * lightFactor);
             RecipeMath.adjust(formula, COBALT_CARBONATE, 0.15 * weight * chromaFactor * coolDepth);
