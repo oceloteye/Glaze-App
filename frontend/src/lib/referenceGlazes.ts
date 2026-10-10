@@ -183,6 +183,27 @@ export const REFERENCE_GLAZES: ReferenceGlaze[] = [
     signature: ['Tin Oxide', 'Chrome Oxide'],
   },
   {
+    // The same chrome-tin chemistry in a lime-rich, low-alumina boron melt (no magnesia or zinc) goes far past
+    // pink: a deep wine / burgundy-purple where thick, breaking to lavender and cream where thin.
+    name: 'June Perry Purple',
+    provenance: 'June Perry, cone 5½–6 oxidation; glazy.org/recipes/10677',
+    tempC: 1222,
+    reduction: false,
+    recipe: {
+      Silica: 32,
+      'Gerstley Borate': 21,
+      Whiting: 20,
+      'Nepheline Syenite': 16,
+      'EPK Kaolin': 11,
+      'Tin Oxide': 5,
+      Bentonite: 2,
+      'Chrome Oxide': 0.25,
+    },
+    looksLike: 'wine / burgundy-purple, lavender where thin',
+    expect: { hue: [320, 355], sat: [0.25, 0.6], light: [0.3, 0.5] },
+    signature: ['Tin Oxide', 'Chrome Oxide'],
+  },
+  {
     name: 'Rutile tan (5x20 + 6% rutile)',
     provenance: 'Textbook rutile in a clear base',
     tempC: 1222,

@@ -109,9 +109,20 @@ export function predictGlazeColor(recipe: Record<string, number>, reduction: boo
     const pinkWithTin = (recipe['Tin Oxide'] ?? 0) > 2 && chrome < 1
     // zinc chromate: chrome goes brown instead of green once there is real zinc in the melt
     const zincBrown = clamp01(((recipe['Zinc Oxide'] ?? 0) - 3) / 5)
-    color = pinkWithTin
-      ? lerp(color, lerp([206, 124, 138], [128, 40, 60], clamp01((chrome - 0.25) / 0.5)), strength(chrome, 0.15))
-      : lerp(color, lerp([74, 112, 70], [134, 92, 58], zincBrown), strength(chrome, 1))
+    if (pinkWithTin) {
+      // The pink is a calcium-tin-silicate (malayaite) pigment forming in the melt, so it needs lime and is
+      // killed by magnesia or zinc. A lime-rich, low-alumina boron melt (June Perry Purple) grows enough of it
+      // to go wine / burgundy-purple at the same chrome dose that only gives rose pink in a stiffer clear.
+      const lime = pct(recipe, ['Whiting', 'Wollastonite']) + pct(recipe, ['Gerstley Borate', 'Ferro Frit 3134']) * 0.5
+      const clay = pct(recipe, ['EPK Kaolin', 'Ball Clay', 'Bentonite'])
+      const wineMelt = clamp01((lime - 18) / 10) * clamp01((18 - clay) / 8)
+      const suppressed = clamp01((pct(recipe, ['Dolomite', 'Talc', 'Zinc Oxide']) - 2) / 6)
+      const depth = clamp01((chrome - 0.15) / 0.35 + 0.7 * wineMelt)
+      const pink = lerp(lerp([206, 124, 138], [104, 34, 70], depth), [164, 142, 146], suppressed)
+      color = lerp(color, pink, strength(chrome, 0.1) * (1 - 0.5 * suppressed))
+    } else {
+      color = lerp(color, lerp([74, 112, 70], [134, 92, 58], zincBrown), strength(chrome, 1))
+    }
   }
 
   const copper = (recipe['Copper Carbonate'] ?? 0) * 0.72 + (recipe['Copper Oxide'] ?? 0)
