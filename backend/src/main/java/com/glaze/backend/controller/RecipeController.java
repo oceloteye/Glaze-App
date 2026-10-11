@@ -10,6 +10,7 @@ import com.glaze.backend.dto.AnalyzeRequest;
 import com.glaze.backend.dto.AnalyzeResponse;
 import com.glaze.backend.dto.GenerateRecipesResponse;
 import com.glaze.backend.dto.GlazeRequest;
+import com.glaze.backend.dto.RecipePreviewResponse;
 import com.glaze.backend.service.GlazeAnalysisService;
 import com.glaze.backend.service.GlazeRecipeService;
 
@@ -31,6 +32,11 @@ public class RecipeController {
     public ResponseEntity<GenerateRecipesResponse> generate(@Valid @RequestBody GlazeRequest request) {
         var response = new GenerateRecipesResponse(glazeRecipeService.generateRecipes(request));
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/preview")
+    public ResponseEntity<RecipePreviewResponse> preview(@Valid @RequestBody GlazeRequest request) {
+        return ResponseEntity.ok(glazeRecipeService.previewRecipe(request));
     }
 
     @PostMapping("/analyze")

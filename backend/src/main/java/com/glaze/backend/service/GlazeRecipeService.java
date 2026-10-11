@@ -1,6 +1,7 @@
 package com.glaze.backend.service;
 
 import com.glaze.backend.dto.GlazeRequest;
+import com.glaze.backend.dto.RecipePreviewResponse;
 import com.glaze.backend.dto.RecipeRoute;
 import com.glaze.backend.dto.RecipeSuggestion;
 import com.glaze.backend.service.recipe.ColourRoute;
@@ -49,6 +50,13 @@ public class GlazeRecipeService {
         return recipes;
     }
 
+    /** The lead recipe on the balanced base: what {@link #generateRecipes} would return first, chemistry only. */
+    public RecipePreviewResponse previewRecipe(GlazeRequest request) {
+        ColourRoute route = ColourRoutes.propose(request).get(0);
+        RecipeSuggestion lead = buildRecipe(route, MELT_VARIANTS[0], false, request);
+        return new RecipePreviewResponse(lead.ingredients(), lead.route());
+    }
+
     private RecipeSuggestion buildRecipe(ColourRoute route, String meltVariant, boolean labelled, GlazeRequest req) {
         int tempC = req.firingTempC();
         Map<String, Double> base = route.baseOverride() != null
@@ -68,8 +76,9 @@ public class GlazeRecipeService {
         route.colourants().accept(formula);
         RecipeModifier.applyEffectAgents(formula, req.effects(), intensity, req.color(), req.secondaryColor(), tempC, req.atmosphere());
         RecipeModifier.applyFeldsparSubstitution(formula, req.feldsparSubstitute());
-        RecipeModifier.applyFoodSafetyAdjustments(formula, req.foodSafe());
+        Map<String, Double> foodSafeLimits = RecipeModifier.applyFoodSafetyAdjustments(formula, req.foodSafe());
         RecipeMath.normalize(formula);
+        foodSafeLimits.keySet().retainAll(formula.keySet());
 
         String label = labelled ? route.name() + " · " + meltVariant : route.name();
         return new RecipeSuggestion(
@@ -81,6 +90,7 @@ public class GlazeRecipeService {
                 // same analysis the Recipe Builder runs, so previews agree across the handoff
                 GlazeAnalyzer.analyze(formula, tempC, req.atmosphere()).properties(),
                 FiringScheduleBuilder.buildAll(meltVariant, req, formula),
-                new RecipeRoute(route.name(), route.summary(), route.signature()));
+                new RecipeRoute(route.name(), route.summary(), route.signature()),
+                foodSafeLimits);
     }
 }

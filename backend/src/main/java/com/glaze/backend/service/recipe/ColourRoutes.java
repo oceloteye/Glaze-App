@@ -93,7 +93,8 @@ public final class ColourRoutes {
     /** Routes for the request by descending fitness; ties keep the primary ahead of alternatives. Never empty. */
     public static List<ColourRoute> propose(GlazeRequest request) {
         int tempC = request.firingTempC();
-        ColourRoute primary = primary(request);
+        // a palette family names its colourant system outright; otherwise it is inferred from the hex
+        ColourRoute primary = HueFamilyRoutes.primary(request).orElseGet(() -> primary(request));
         var routes = new ArrayList<ColourRoute>();
         routes.add(primary);
 

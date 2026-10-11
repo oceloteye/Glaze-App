@@ -681,6 +681,23 @@ class GlazeRecipeServiceTest {
             .isLessThanOrEqualTo(normalIngredients.getOrDefault("Iron Chromate", 0.0));
         }
 
+    @Test
+    void foodSafeLimitsNameTheColorantsThatWereCut() {
+        var normal = new GlazeRequest("#2d7cc4", 1220, "Satin", "Medium", null, List.of("Flame"),
+                50, null, "Potash Feldspar", "Vibrant", "oxidation", false);
+        var foodSafe = new GlazeRequest("#2d7cc4", 1220, "Satin", "Medium", null, List.of("Flame"),
+                50, null, "Potash Feldspar", "Vibrant", "oxidation", true);
+
+        assertThat(getBalanced(service.generateRecipes(normal)).foodSafeLimits()).isEmpty();
+
+        var safe = getBalanced(service.generateRecipes(foodSafe));
+        assertThat(safe.foodSafeLimits())
+                .containsEntry("Cobalt Carbonate", 0.35)
+                .containsEntry("Copper Carbonate", 0.45)
+                .doesNotContainKey("Iron Chromate"); // cut to zero, so no longer on the card
+        assertThat(safe.ingredients().keySet()).containsAll(safe.foodSafeLimits().keySet());
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     /** The first recipe is always the primary colourant route on the standard base. */

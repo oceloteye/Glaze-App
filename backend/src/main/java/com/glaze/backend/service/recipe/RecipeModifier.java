@@ -1,5 +1,6 @@
 package com.glaze.backend.service.recipe;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -282,9 +283,19 @@ public final class RecipeModifier {
         }
     }
 
-    public static void applyFoodSafetyAdjustments(Map<String, Double> formula, Boolean foodSafe) {
+    /** Fraction of the colour dose that dinnerware mode keeps, per high-leach-risk material. */
+    private static final Map<String, Double> FOOD_SAFE_LIMITS = Map.of(
+            COPPER_CARBONATE, 0.45,
+            COBALT_CARBONATE, 0.35,
+            MANGANESE_DIOXIDE, 0.25,
+            MANGANESE_GRANULES, 0.15,
+            IRON_CHROMATE, 0.0,
+            LITHIUM_CARBONATE, 0.75);
+
+    /** Applies dinnerware mode and returns the materials it actually cut, with the fraction each kept. */
+    public static Map<String, Double> applyFoodSafetyAdjustments(Map<String, Double> formula, Boolean foodSafe) {
         if (!Boolean.TRUE.equals(foodSafe)) {
-            return;
+            return Map.of();
         }
 
         RecipeMath.adjust(formula, SILICA, 3.2);
@@ -292,12 +303,14 @@ public final class RecipeModifier {
         RecipeMath.adjust(formula, BENTONITE, 0.5);
         RecipeMath.adjust(formula, ZIRCOPAX, 0.4);
 
-        RecipeMath.scaleIfPresent(formula, COPPER_CARBONATE, 0.45);
-        RecipeMath.scaleIfPresent(formula, COBALT_CARBONATE, 0.35);
-        RecipeMath.scaleIfPresent(formula, MANGANESE_DIOXIDE, 0.25);
-        RecipeMath.scaleIfPresent(formula, MANGANESE_GRANULES, 0.15);
-        RecipeMath.scaleIfPresent(formula, IRON_CHROMATE, 0.0);
-        RecipeMath.scaleIfPresent(formula, LITHIUM_CARBONATE, 0.75);
+        var limited = new LinkedHashMap<String, Double>();
+        FOOD_SAFE_LIMITS.forEach((material, factor) -> {
+            if (formula.getOrDefault(material, 0.0) > 0.0) {
+                RecipeMath.scaleIfPresent(formula, material, factor);
+                limited.put(material, factor);
+            }
+        });
+        return limited;
     }
 
     public static void applyFeldsparSubstitution(Map<String, Double> formula, String substitution) {
@@ -511,7 +524,7 @@ public final class RecipeModifier {
     }
 
     /** Copper only goes turquoise in a soda/lithium melt: swap potash feldspar for nepheline syenite and the calcium frit for the soda frit. */
-    private static void moveToAlkalineFlux(Map<String, Double> formula) {
+    static void moveToAlkalineFlux(Map<String, Double> formula) {
         Double potash = formula.remove(POTASH_FELDSPAR);
         if (potash != null) {
             RecipeMath.adjust(formula, NEPHELINE_SYENITE, potash);
@@ -662,6 +675,11 @@ public final class RecipeModifier {
         }
     }
 
+    /** Colourant dose multiplier for the requested colour character (Clean, Earthy, Vibrant). */
+    static double characterChroma(String colorCharacter) {
+        return applyCharacterChroma(1.0, normalizeCharacter(colorCharacter));
+    }
+
     private static double applyCharacterChroma(double base, String colorCharacter) {
         return switch (colorCharacter) {
             case CHARACTER_CLEAN -> base * 0.92;
@@ -718,6 +736,10 @@ public final class RecipeModifier {
             return CHARACTER_VIBRANT;
         }
         return CHARACTER_NATURAL;
+    }
+
+    static boolean isReduction(String atmosphere) {
+        return ATMOSPHERE_REDUCTION.equals(normalizeAtmosphere(atmosphere));
     }
 
     private static String normalizeAtmosphere(String atmosphere) {
