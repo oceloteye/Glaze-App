@@ -399,8 +399,8 @@ class GlazeRecipeServiceTest {
         assertThat(none).isEqualTo(semi);
     }
 
-        @Test
-        void cone6PurpleVariegatedAvoidsOverdarkColorantLoad() {
+    @Test
+    void cone6PurpleVariegatedAvoidsOverdarkColorantLoad() {
         var recipes = service.generateRecipes(
             request("#6f42c1", 1230, "Satin", "Medium", List.of("Variegated"), 100, null));
         var balanced = getBalanced(recipes).ingredients();
@@ -411,10 +411,12 @@ class GlazeRecipeServiceTest {
             + balanced.getOrDefault("Yellow Iron Oxide", 0.0);
         double cobalt = balanced.getOrDefault("Cobalt Carbonate", 0.0);
 
-        assertThat(manganese).isLessThanOrEqualTo(1.5);
+        // a mid-lightness violet: manganese carries the colour, cobalt pulls it blue, iron stays a trace
+        assertThat(manganese).isBetween(1.0, 4.5);
         assertThat(ironLoad).isLessThanOrEqualTo(1.5);
-        assertThat(cobalt).isGreaterThanOrEqualTo(0.65);
-        }
+        assertThat(cobalt).isGreaterThan(0.0);
+        assertThat(cobalt).isLessThan(manganese);
+    }
 
     @Test
     void purpleTargetPrefersVioletColorantsOverBlueCobaltBias() {
@@ -426,23 +428,117 @@ class GlazeRecipeServiceTest {
         double cobalt = balanced.getOrDefault("Cobalt Carbonate", 0.0);
         double copper = balanced.getOrDefault("Copper Carbonate", 0.0);
 
+        // copper greens a violet; the purple route is manganese plus a cobalt trace only
         assertThat(manganese).isGreaterThan(cobalt);
-        assertThat(copper).isGreaterThan(0.0);
+        assertThat(cobalt).isGreaterThan(0.0);
+        assertThat(copper).isZero();
     }
 
     @Test
     void midHighPurpleFiringStaysBalancedWithoutBlueCobaltDrift() {
-        var recipes = service.generateRecipes(request("#843adf", 1222, "Satin", "High", List.of(), 50, null));
-        var balanced = getBalanced(recipes).ingredients();
+        var balanced = getBalanced(service.generateRecipes(
+                request("#843adf", 1222, "Satin", "High", List.of(), 50, null))).ingredients();
 
         double manganese = balanced.getOrDefault("Manganese Dioxide", 0.0);
         double cobalt = balanced.getOrDefault("Cobalt Carbonate", 0.0);
-        double copper = balanced.getOrDefault("Copper Carbonate", 0.0);
 
-        assertThat(manganese).isGreaterThan(0.75);
-        assertThat(manganese).isLessThanOrEqualTo(1.35);
-        assertThat(cobalt).isGreaterThanOrEqualTo(0.8);
-        assertThat(copper).isGreaterThan(0.0);
+        assertThat(manganese).isBetween(1.0, 4.5);
+        assertThat(cobalt).isBetween(0.1, 1.0);
+    }
+
+    @Test
+    void magentaIsChromeTinWhileVioletStaysManganeseCobalt() {
+        var violet = getBalanced(service.generateRecipes(
+                request("#6b248f", 1222, "Glossy", "Medium", List.of(), 50, null))).ingredients();
+        var magenta = getBalanced(service.generateRecipes(
+                request("#8f246b", 1222, "Glossy", "Medium", List.of(), 50, null))).ingredients();
+
+        // violet is cobalt pulled red by manganese; a saturated magenta is chrome-tin raspberry, not plum
+        assertThat(violet.getOrDefault("Manganese Dioxide", 0.0))
+                .isGreaterThan(violet.getOrDefault("Cobalt Carbonate", 0.0));
+        assertThat(violet.getOrDefault("Cobalt Carbonate", 0.0)).isGreaterThan(0.0);
+        assertThat(magenta.getOrDefault("Tin Oxide", 0.0)).isGreaterThan(2.0);
+        assertThat(magenta.getOrDefault("Chrome Oxide", 0.0)).isBetween(0.2, 1.0);
+        assertThat(magenta).doesNotContainKeys("Manganese Dioxide", "Copper Carbonate");
+    }
+
+    @Test
+    void wineRedTargetRoutesToChromeTinNotIronSaturate() {
+        var balanced = getBalanced(service.generateRecipes(
+                request("#8f2447", 1222, "Glossy", "Medium", List.of(), 50, null))).ingredients();
+
+        assertThat(balanced.getOrDefault("Tin Oxide", 0.0)).isGreaterThan(2.0);
+        assertThat(balanced.getOrDefault("Chrome Oxide", 0.0)).isBetween(0.2, 1.0);
+        assertThat(balanced.getOrDefault("Red Iron Oxide", 0.0)).isLessThan(2.0);
+    }
+
+    @Test
+    void chromeTinAsksSwapMagnesiaForLimeSoThePinkCanForm() {
+        // the satin base carries dolomite; chrome-tin pink is a calcium pigment that magnesia suppresses
+        var wine = getBalanced(service.generateRecipes(
+                request("#6e2a4a", 1222, "Satin", "Medium", List.of(), 50, null))).ingredients();
+
+        assertThat(wine.getOrDefault("Tin Oxide", 0.0)).isGreaterThan(2.0);
+        assertThat(wine.getOrDefault("Chrome Oxide", 0.0)).isBetween(0.3, 0.7);
+        assertThat(wine).doesNotContainKeys("Dolomite", "Talc", "Zinc Oxide", "Red Iron Oxide");
+        assertThat(wine.getOrDefault("Whiting", 0.0)).isGreaterThan(14.0);
+    }
+
+    @Test
+    void chromeTinWineLeadsBurgundyPurpleAsksAtCone6() {
+        var recipes = service.generateRecipes(request("#6e2a4a", 1222, "Satin", "Medium", List.of(), 50, null));
+        var lead = recipes.get(0);
+
+        assertThat(lead.route().name()).isEqualTo("Chrome-tin wine");
+        assertThat(lead.route().signature()).containsExactlyInAnyOrder("Tin Oxide", "Chrome Oxide");
+        var ingredients = lead.ingredients();
+        assertThat(ingredients.getOrDefault("Gerstley Borate", 0.0)).isGreaterThan(15.0);
+        assertThat(ingredients.getOrDefault("Whiting", 0.0)).isGreaterThan(15.0);
+        assertThat(ingredients.getOrDefault("Nepheline Syenite", 0.0)).isGreaterThan(10.0);
+        assertThat(ingredients.getOrDefault("Tin Oxide", 0.0)).isBetween(3.5, 5.5);
+        assertThat(ingredients.getOrDefault("Chrome Oxide", 0.0)).isBetween(0.18, 0.45);
+        assertThat(ingredients).doesNotContainKeys("Dolomite", "Talc", "Zinc Oxide", "Manganese Dioxide", "Cobalt Carbonate");
+
+        // a true violet is not a chrome-tin wine colour, and neither is a high-fire or reduction ask
+        assertThat(service.generateRecipes(request("#6b248f", 1222, "Satin", "Medium", List.of(), 50, null)))
+                .noneMatch(r -> r.route().name().equals("Chrome-tin wine"));
+        assertThat(service.generateRecipes(request("#6e2a4a", 1285, "Satin", "Medium", List.of(), 50, null)))
+                .noneMatch(r -> r.route().name().equals("Chrome-tin wine"));
+    }
+
+    @Test
+    void saturatedPurpleTrimsSemiOpaqueZirconThatWouldPastelIt() {
+        var purple = getBalanced(service.generateRecipes(
+                request("#8f2291", 1222, "Satin", "Medium", List.of(), 50, null))).ingredients();
+        var dusty = getBalanced(service.generateRecipes(
+                request("#7e5095", 1222, "Satin", "Medium", List.of(), 50, null))).ingredients();
+
+        assertThat(purple.getOrDefault("Zircopax", 0.0)).isLessThan(2.5);
+        assertThat(purple.getOrDefault("Manganese Dioxide", 0.0)).isGreaterThan(3.0);
+        assertThat(dusty.getOrDefault("Zircopax", 0.0)).isGreaterThan(purple.getOrDefault("Zircopax", 0.0));
+    }
+
+    @Test
+    void deepTealGetsMoreCopperThanLightTurquoisePlusATraceDeepener() {
+        var deep = getBalanced(service.generateRecipes(
+                request("#248f8f", 1222, "Glossy", "Medium", List.of(), 50, null))).ingredients();
+        var light = getBalanced(service.generateRecipes(
+                request("#47d1d1", 1222, "Glossy", "Medium", List.of(), 50, null))).ingredients();
+
+        assertThat(deep.getOrDefault("Copper Carbonate", 0.0))
+                .isGreaterThan(light.getOrDefault("Copper Carbonate", 0.0));
+        assertThat(deep.getOrDefault("Chrome Oxide", 0.0) + deep.getOrDefault("Cobalt Carbonate", 0.0))
+                .isBetween(0.1, 0.8);
+        assertThat(light).doesNotContainKeys("Chrome Oxide", "Cobalt Carbonate");
+    }
+
+    @Test
+    void lightCeruleanIsNotOverdosedWithCobalt() {
+        var balanced = getBalanced(service.generateRecipes(
+                request("#47a3d1", 1222, "Glossy", "Medium", List.of(), 50, null))).ingredients();
+
+        assertThat(balanced.getOrDefault("Copper Carbonate", 0.0)).isBetween(1.5, 3.0);
+        assertThat(balanced.getOrDefault("Cobalt Carbonate", 0.0)).isBetween(0.1, 0.5);
     }
 
     // ── Intensity scaling ─────────────────────────────────────────────────────

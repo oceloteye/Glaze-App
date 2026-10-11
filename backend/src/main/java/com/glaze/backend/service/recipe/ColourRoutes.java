@@ -12,6 +12,7 @@ import java.util.function.Consumer;
 import com.glaze.backend.dto.GlazeRequest;
 
 import static com.glaze.backend.service.recipe.RecipeIngredients.BARIUM_CARBONATE;
+import static com.glaze.backend.service.recipe.RecipeIngredients.BENTONITE;
 import static com.glaze.backend.service.recipe.RecipeIngredients.BONE_ASH;
 import static com.glaze.backend.service.recipe.RecipeIngredients.CHROME_OXIDE;
 import static com.glaze.backend.service.recipe.RecipeIngredients.COBALT_CARBONATE;
@@ -25,6 +26,7 @@ import static com.glaze.backend.service.recipe.RecipeIngredients.ILMENITE_GRANUL
 import static com.glaze.backend.service.recipe.RecipeIngredients.IRON_CHROMATE;
 import static com.glaze.backend.service.recipe.RecipeIngredients.IRON_OXIDE;
 import static com.glaze.backend.service.recipe.RecipeIngredients.MANGANESE_DIOXIDE;
+import static com.glaze.backend.service.recipe.RecipeIngredients.NEPHELINE_SYENITE;
 import static com.glaze.backend.service.recipe.RecipeIngredients.NICKEL_OXIDE;
 import static com.glaze.backend.service.recipe.RecipeIngredients.POTASH_FELDSPAR;
 import static com.glaze.backend.service.recipe.RecipeIngredients.RED_IRON_OXIDE;
@@ -32,6 +34,7 @@ import static com.glaze.backend.service.recipe.RecipeIngredients.RUTILE;
 import static com.glaze.backend.service.recipe.RecipeIngredients.SILICA;
 import static com.glaze.backend.service.recipe.RecipeIngredients.TIN_OXIDE;
 import static com.glaze.backend.service.recipe.RecipeIngredients.TITANIUM_DIOXIDE;
+import static com.glaze.backend.service.recipe.RecipeIngredients.WHITING;
 import static com.glaze.backend.service.recipe.RecipeIngredients.YELLOW_IRON_OXIDE;
 import static com.glaze.backend.service.recipe.RecipeIngredients.ZINC_OXIDE;
 import static com.glaze.backend.service.recipe.RecipeIngredients.ZIRCOPAX;
@@ -167,6 +170,28 @@ public final class ColourRoutes {
                     "The classic high-fire barium matte: barium turns copper a true turquoise-blue and gives a silky matte surface. Not for food surfaces.",
                     List.of(BARIUM_CARBONATE, COPPER_CARBONATE), bariumBase,
                     formula -> RecipeMath.adjust(formula, COPPER_CARBONATE, copper), foodSafe ? 0.7 : LEADS));
+        }
+
+        // ── wine / burgundy-purple ─────────────────────────────────────────────
+        // chrome-tin in a lime-rich, low-alumina boron melt grows enough malayaite pigment to go wine and
+        // burgundy-purple where a stiffer clear only reaches pink. The base is the recipe.
+        if (!reduction && tempC >= 1180 && tempC <= 1250 && h >= 312 && h < 355 && s >= 0.3 && l >= 0.22 && l < 0.5) {
+            double chrome = 0.22 + 0.2 * RecipeMath.clamp01((0.42 - l) / 0.2);
+            var wineBase = new LinkedHashMap<String, Double>();
+            wineBase.put(SILICA, 32.0);
+            wineBase.put(GERSTLEY_BORATE, 21.0);
+            wineBase.put(WHITING, 20.0);
+            wineBase.put(NEPHELINE_SYENITE, 16.0);
+            wineBase.put(EPK_KAOLIN, 11.0);
+            wineBase.put(BENTONITE, 2.0);
+            alternatives.add(new ColourRoute("Chrome-tin wine",
+                    "Cone 6 chrome-tin: 5% tin and a quarter percent of chrome in a lime-rich, low-alumina boron melt go wine to burgundy-purple where thick and break to lavender where thin. Magnesia and zinc would turn it grey, so none is allowed in.",
+                    List.of(TIN_OXIDE, CHROME_OXIDE), wineBase,
+                    formula -> {
+                        RecipeModifier.moveToLimeFlux(formula);
+                        RecipeMath.adjust(formula, TIN_OXIDE, 5.0);
+                        RecipeMath.adjust(formula, CHROME_OXIDE, chrome);
+                    }, LEADS));
         }
 
         // ── browns / tans ──────────────────────────────────────────────────────

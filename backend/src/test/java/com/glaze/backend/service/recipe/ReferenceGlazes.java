@@ -81,8 +81,18 @@ final class ReferenceGlazes {
             Set.of("Matte", "Dry matte", "Satin"),
             umf("SiO2", 2.4, 3.6, "Al2O3", 0.40, 0.70, "MgO", 0.30, 0.55, "CaO", 0.30, 0.55));
 
+    /** June Perry Purple: cone 6 oxidation chrome-tin wine in a lime-rich, low-alumina boron melt (Si:Al ≈ 10). */
+    static final ReferenceGlaze JUNE_PERRY_PURPLE = new ReferenceGlaze(
+            "June Perry Purple (cone 6 chrome-tin wine)",
+            "June Perry; widely shared, e.g. glazy.org/recipes/10677",
+            1222,
+            recipe(SILICA, 32, GERSTLEY_BORATE, 21, WHITING, 20, NEPHELINE_SYENITE, 16, EPK_KAOLIN, 11,
+                    TIN_OXIDE, 5, BENTONITE, 2, CHROME_OXIDE, 0.25),
+            Set.of("Glossy", "Satin"),
+            umf("SiO2", 2.2, 2.8, "Al2O3", 0.20, 0.30, "B2O3", 0.16, 0.30, "CaO", 0.70, 0.86, "KNaO", 0.10, 0.22, "MgO", 0.0, 0.12));
+
     static final List<ReferenceGlaze> ALL = List.of(
-            LEACH_4321, TENMOKU, FIVE_BY_TWENTY, FLOATING_BLUE, LOW_FIRE_FRIT_CLEAR, DOLOMITE_MATTE);
+            LEACH_4321, TENMOKU, FIVE_BY_TWENTY, FLOATING_BLUE, LOW_FIRE_FRIT_CLEAR, DOLOMITE_MATTE, JUNE_PERRY_PURPLE);
 
     private ReferenceGlazes() {
     }
