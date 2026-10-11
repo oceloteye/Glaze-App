@@ -20,19 +20,21 @@ export function HueFamilyPicker({ form, setForm, predictedColor, routeName }: Pr
       <div className="hue-chips" role="radiogroup" aria-label="Hue family">
         {HUE_FAMILIES.map((family) => {
           const active = family.id === selected.id
+          const stainOnly = Boolean(family.stainNote)
           return (
             <button
               key={family.id}
               type="button"
               role="radio"
               aria-checked={active}
-              className={`hue-chip${active ? ' hue-chip-active' : ''}${family.stainNote ? ' hue-chip-stain' : ''}`}
-              title={family.stainNote ? `${family.label} — stain only` : `${family.label} — ${family.system}`}
+              disabled={stainOnly}
+              className={`hue-chip${active ? ' hue-chip-active' : ''}${stainOnly ? ' hue-chip-stain' : ''}`}
+              title={stainOnly ? `${family.label} — needs an inclusion stain; not available yet` : `${family.label} — ${family.system}`}
               onClick={() => setForm({ ...form, hueFamily: family.id })}
             >
               <span className="hue-chip-swatch" style={{ background: familyHex(family.id, saturation, depth) }} />
               <span className="hue-chip-label">{family.label}</span>
-              {family.stainNote ? <span className="hue-chip-flag" aria-label="stain only">stain</span> : null}
+              {stainOnly ? <span className="hue-chip-flag" aria-label="stain only">stain</span> : null}
             </button>
           )
         })}

@@ -419,6 +419,24 @@
   box-shadow: 0 0 0 2px rgba(63, 98, 72, 0.25);
 }
 
+.form-panel .hue-chip-stain:disabled {
+  cursor: not-allowed;
+  opacity: 1;
+  color: var(--text-muted);
+  border-style: dashed;
+  background: #f4f0ea;
+  transform: none;
+}
+
+.form-panel .hue-chip-stain:disabled .hue-chip-swatch {
+  filter: grayscale(0.85);
+  opacity: 0.45;
+}
+
+.form-panel .hue-chip-stain:disabled .hue-chip-flag {
+  background: #a79a8c;
+}
+
 .hue-chip-swatch {
   display: block;
   width: 2.1rem;
