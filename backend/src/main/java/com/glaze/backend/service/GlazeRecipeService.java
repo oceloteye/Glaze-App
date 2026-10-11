@@ -1,6 +1,7 @@
 package com.glaze.backend.service;
 
 import com.glaze.backend.dto.GlazeRequest;
+import com.glaze.backend.dto.RecipePreviewResponse;
 import com.glaze.backend.dto.RecipeRoute;
 import com.glaze.backend.dto.RecipeSuggestion;
 import com.glaze.backend.service.recipe.ColourRoute;
@@ -47,6 +48,13 @@ public class GlazeRecipeService {
             recipes.add(buildRecipe(filler, MELT_VARIANTS[i + 1], true, request));
         }
         return recipes;
+    }
+
+    /** The lead recipe on the balanced base: what {@link #generateRecipes} would return first, chemistry only. */
+    public RecipePreviewResponse previewRecipe(GlazeRequest request) {
+        ColourRoute route = ColourRoutes.propose(request).get(0);
+        RecipeSuggestion lead = buildRecipe(route, MELT_VARIANTS[0], false, request);
+        return new RecipePreviewResponse(lead.ingredients(), lead.route());
     }
 
     private RecipeSuggestion buildRecipe(ColourRoute route, String meltVariant, boolean labelled, GlazeRequest req) {

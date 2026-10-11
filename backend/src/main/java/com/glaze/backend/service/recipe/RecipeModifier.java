@@ -511,7 +511,7 @@ public final class RecipeModifier {
     }
 
     /** Copper only goes turquoise in a soda/lithium melt: swap potash feldspar for nepheline syenite and the calcium frit for the soda frit. */
-    private static void moveToAlkalineFlux(Map<String, Double> formula) {
+    static void moveToAlkalineFlux(Map<String, Double> formula) {
         Double potash = formula.remove(POTASH_FELDSPAR);
         if (potash != null) {
             RecipeMath.adjust(formula, NEPHELINE_SYENITE, potash);
@@ -662,6 +662,11 @@ public final class RecipeModifier {
         }
     }
 
+    /** Colourant dose multiplier for the requested colour character (Clean, Earthy, Vibrant). */
+    static double characterChroma(String colorCharacter) {
+        return applyCharacterChroma(1.0, normalizeCharacter(colorCharacter));
+    }
+
     private static double applyCharacterChroma(double base, String colorCharacter) {
         return switch (colorCharacter) {
             case CHARACTER_CLEAN -> base * 0.92;
@@ -718,6 +723,10 @@ public final class RecipeModifier {
             return CHARACTER_VIBRANT;
         }
         return CHARACTER_NATURAL;
+    }
+
+    static boolean isReduction(String atmosphere) {
+        return ATMOSPHERE_REDUCTION.equals(normalizeAtmosphere(atmosphere));
     }
 
     private static String normalizeAtmosphere(String atmosphere) {

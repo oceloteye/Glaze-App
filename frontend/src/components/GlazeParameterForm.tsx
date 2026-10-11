@@ -1,4 +1,5 @@
 import { GlazePreview } from '../GlazePreview'
+import { HueFamilyPicker } from './HueFamilyPicker'
 import { ATMOSPHERE_OPTIONS, EFFECTS, SURFACE_FINISHES, STABILITY_STOPS, OPACITY_STOPS, SECONDARY_COLOR_LABEL, CONES } from '../app/constants'
 import { fToC, syncTemperatureInput } from '../app/utils'
 import type { GlazeComposer } from '../hooks/useGlazeComposer'
@@ -10,6 +11,8 @@ interface Props {
 export function GlazeParameterForm({ composer }: Props) {
   const {
     form,
+    referencePreview,
+    referenceColor,
     loading,
     error,
     handleSubmit,
@@ -34,49 +37,27 @@ export function GlazeParameterForm({ composer }: Props) {
       <h2>Glaze Parameters</h2>
 
       <GlazePreview
-        color={form.color}
+        color={referenceColor}
         surfaceFinish={form.surfaceFinish}
         effect={form.effects[0] ?? ''}
         secondaryColor={showSecondaryColor ? secondaryColor : undefined}
         intensity={effectIntensity}
+        recipeIngredients={referencePreview?.ingredients}
         firingTempC={form.firingTempC}
         stability={form.stability}
         opacity={form.opacity}
         foodSafe={form.foodSafe ?? false}
         coneLabel={CONES[coneIndex].name}
         atmosphere={form.atmosphere}
-        caption="Color Reference"
+        caption={referencePreview ? 'Color Reference — predicted from chemistry' : 'Color Reference'}
       />
 
-      <label>
-        Color goal
-        <div className="color-picker-row">
-          <input
-            type="color"
-            value={form.color}
-            onChange={(event) => setForm({ ...form, color: event.target.value })}
-          />
-          <input
-            type="text"
-            className="hex-input"
-            value={form.color}
-            maxLength={7}
-            placeholder="#rrggbb"
-            onChange={(event) => {
-              const value = event.target.value
-              if (/^#[0-9a-fA-F]{0,6}$/.test(value)) {
-                setForm({ ...form, color: value })
-              }
-            }}
-            onBlur={(event) => {
-              if (!/^#[0-9a-fA-F]{6}$/.test(event.target.value)) {
-                setForm({ ...form, color: '#7f9e87' })
-              }
-            }}
-            required
-          />
-        </div>
-      </label>
+      <HueFamilyPicker
+        form={form}
+        setForm={setForm}
+        predictedColor={referencePreview ? referenceColor : undefined}
+        routeName={referencePreview?.route?.name}
+      />
 
       <label>
         Firing temperature

@@ -373,6 +373,99 @@
   letter-spacing: 0.04em;
 }
 
+.hue-picker {
+  display: grid;
+  gap: 0.5rem;
+  font-size: 0.95rem;
+  color: var(--text-muted);
+}
+
+.hue-picker-title {
+  font-size: 0.95rem;
+}
+
+.hue-chips {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(5.4rem, 1fr));
+  gap: 0.4rem;
+}
+
+.form-panel .hue-chip {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 0.3rem;
+  margin: 0;
+  padding: 0.45rem 0.3rem 0.4rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  font-weight: 500;
+  font-size: 0.74rem;
+  line-height: 1.1;
+  color: var(--text-primary);
+  background: #fff;
+  cursor: pointer;
+  transition: border-color 120ms ease, transform 120ms ease;
+}
+
+.form-panel .hue-chip:hover:enabled {
+  transform: translateY(-1px);
+  filter: none;
+  border-color: #d0bca8;
+}
+
+.form-panel .hue-chip-active {
+  border-color: var(--green-deep);
+  box-shadow: 0 0 0 2px rgba(63, 98, 72, 0.25);
+}
+
+.hue-chip-swatch {
+  display: block;
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.hue-chip-label {
+  text-align: center;
+}
+
+.hue-chip-flag {
+  position: absolute;
+  top: 0.25rem;
+  right: 0.3rem;
+  padding: 0.05rem 0.3rem;
+  border-radius: 6px;
+  font-size: 0.6rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #fff;
+  background: #b0512e;
+}
+
+.hue-slider {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.hue-slider-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.95rem;
+  color: var(--text-muted);
+}
+
+.hue-slider-value {
+  font-variant-numeric: tabular-nums;
+  color: var(--green-deep);
+  font-weight: 600;
+}
+
+.hue-stain-note {
+  color: #b0512e;
+}
+
 .form-panel button {
   margin-top: 0.4rem;
   border: 0;

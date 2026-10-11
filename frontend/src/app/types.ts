@@ -2,6 +2,12 @@ export type TempUnit = 'C' | 'F'
 
 export type GlazeRequest = {
   color: string
+  /** Palette family id; when set the backend uses it to pick the colourant system and treats color as derived. */
+  hueFamily?: string
+  /** 0–100 along the family's muted → pure range. */
+  saturation?: number
+  /** 0–100 along the family's light → deep range. */
+  depth?: number
   firingTempC: number
   surfaceFinish: string
   stability: string
@@ -69,6 +75,11 @@ export type RecipeSuggestion = {
 
 export type GenerateRecipesResponse = {
   recipes: RecipeSuggestion[]
+}
+
+export type RecipePreviewResponse = {
+  ingredients: Record<string, number>
+  route?: RecipeRoute
 }
 
 export type RecipeExportPayload = {
