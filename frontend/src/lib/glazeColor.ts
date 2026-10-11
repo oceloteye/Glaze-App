@@ -89,7 +89,12 @@ export function predictGlazeColor(recipe: Record<string, number>, reduction: boo
   if (rutile > 0) color = lerp(color, [196, 160, 112], strength(rutile, 5))
 
   const manganese = pct(recipe, ['Manganese Dioxide']) + (recipe['Manganese Granules'] ?? 0) * 0.4
-  if (manganese > 0) color = lerp(color, [104, 52, 74], strength(manganese, 2.5))
+  const cobalt = (recipe['Cobalt Carbonate'] ?? 0) * 0.63 + (recipe['Cobalt Oxide'] ?? 0) * 0.93
+  if (manganese > 0) {
+    // manganese alone is a dull plum; cobalt alongside it reads as a cleaner violet, in proportion to the load
+    const plum: Rgb = lerp([108, 54, 90], [96, 40, 128], clamp01((cobalt * 5) / Math.max(manganese, 0.1)))
+    color = lerp(color, plum, strength(manganese, 2.5))
+  }
 
   const nickel = recipe['Nickel Oxide'] ?? 0
   if (nickel > 0) {
@@ -100,13 +105,24 @@ export function predictGlazeColor(recipe: Record<string, number>, reduction: boo
 
   const chrome = (recipe['Chrome Oxide'] ?? 0) + (recipe['Iron Chromate'] ?? 0) * 0.7
   if (chrome > 0) {
-    // chrome-tin pink: a trace of chrome in a tin-opacified base; the stain forms readily
+    // chrome-tin pink: a trace of chrome in a tin-opacified base; more chrome deepens it through rose to maroon
     const pinkWithTin = (recipe['Tin Oxide'] ?? 0) > 2 && chrome < 1
     // zinc chromate: chrome goes brown instead of green once there is real zinc in the melt
     const zincBrown = clamp01(((recipe['Zinc Oxide'] ?? 0) - 3) / 5)
-    color = pinkWithTin
-      ? lerp(color, [206, 124, 138], strength(chrome, 0.15))
-      : lerp(color, lerp([74, 112, 70], [134, 92, 58], zincBrown), strength(chrome, 1))
+    if (pinkWithTin) {
+      // The pink is a calcium-tin-silicate (malayaite) pigment forming in the melt, so it needs lime and is
+      // killed by magnesia or zinc. A lime-rich, low-alumina boron melt (June Perry Purple) grows enough of it
+      // to go wine / burgundy-purple at the same chrome dose that only gives rose pink in a stiffer clear.
+      const lime = pct(recipe, ['Whiting', 'Wollastonite']) + pct(recipe, ['Gerstley Borate', 'Ferro Frit 3134']) * 0.5
+      const clay = pct(recipe, ['EPK Kaolin', 'Ball Clay', 'Bentonite'])
+      const wineMelt = clamp01((lime - 18) / 10) * clamp01((18 - clay) / 8)
+      const suppressed = clamp01((pct(recipe, ['Dolomite', 'Talc', 'Zinc Oxide']) - 2) / 6)
+      const depth = clamp01((chrome - 0.15) / 0.35 + 0.7 * wineMelt)
+      const pink = lerp(lerp([206, 124, 138], [104, 34, 70], depth), [164, 142, 146], suppressed)
+      color = lerp(color, pink, strength(chrome, 0.1) * (1 - 0.5 * suppressed))
+    } else {
+      color = lerp(color, lerp([74, 112, 70], [134, 92, 58], zincBrown), strength(chrome, 1))
+    }
   }
 
   const copper = (recipe['Copper Carbonate'] ?? 0) * 0.72 + (recipe['Copper Oxide'] ?? 0)
@@ -115,7 +131,11 @@ export function predictGlazeColor(recipe: Record<string, number>, reduction: boo
       pct(recipe, ['Nepheline Syenite', 'Soda Feldspar', 'Lithium Carbonate', 'Barium Carbonate']) +
         (recipe['Ferro Frit 3134'] ?? 0) * 0.5 >
       25
-    const green: Rgb = alkaline ? [72, 170, 165] : [62, 134, 78]
+    // past ~2% copper the colour keeps deepening before it finally goes metallic black
+    const heavy = clamp01((copper - 2) / 2.5)
+    const green: Rgb = alkaline
+      ? lerp([72, 170, 165], [34, 118, 116], heavy)
+      : lerp([62, 134, 78], [40, 98, 58], heavy)
     if (reduction) {
       // copper red only forms from a trace; a few percent stays green (oribe) even in reduction
       const red = clamp01((1.6 - copper) / 0.8)
@@ -126,10 +146,12 @@ export function predictGlazeColor(recipe: Record<string, number>, reduction: boo
     }
   }
 
-  const cobalt = (recipe['Cobalt Carbonate'] ?? 0) * 0.63 + (recipe['Cobalt Oxide'] ?? 0) * 0.93
   if (cobalt > 0) {
     const softened = pct(recipe, ['Dolomite', 'Talc']) > 10
-    const target: Rgb = softened ? [92, 112, 168] : [30, 52, 148]
+    let target: Rgb = softened ? [92, 112, 168] : [30, 52, 148]
+    // manganese alongside cobalt reads violet rather than blue, the more so as it outweighs the cobalt
+    const violet = manganese > 0 ? clamp01(manganese / (manganese + cobalt * 4)) : 0
+    target = lerp(target, [84, 40, 150], violet)
     // an iron-saturated melt masks the blue; cobalt there only deepens it toward black
     const ironMask = clamp01((8 - iron) / 4)
     color = lerp(color, target, strength(cobalt, 0.35) * ironMask)
