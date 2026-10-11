@@ -771,6 +771,27 @@
   margin-top: 0.3rem;
 }
 
+.ingredient-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.food-safe-flag {
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  border: 1px solid #c9b79f;
+  background: #f6efe4;
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #7a5a3a;
+  cursor: help;
+  white-space: nowrap;
+}
+
 .ingredient-name {
   position: relative;
   cursor: help;
