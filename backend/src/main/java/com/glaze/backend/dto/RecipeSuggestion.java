@@ -11,6 +11,8 @@ public record RecipeSuggestion(
         Umf umf,
         GlazeProperties properties,
         List<FiringSchedule> firingSchedules,
-        RecipeRoute route
+        RecipeRoute route,
+        /** Colourants dinnerware mode reduced, mapped to the fraction of the dose kept (empty when not applied). */
+        Map<String, Double> foodSafeLimits
 ) {
 }

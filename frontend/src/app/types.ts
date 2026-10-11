@@ -71,6 +71,8 @@ export type RecipeSuggestion = {
   properties?: GlazeProperties
   firingSchedules: FiringSchedule[]
   route?: RecipeRoute
+  /** Colourants dinnerware mode reduced, mapped to the fraction of the dose kept. */
+  foodSafeLimits?: Record<string, number>
 }
 
 export type GenerateRecipesResponse = {

@@ -76,8 +76,9 @@ public class GlazeRecipeService {
         route.colourants().accept(formula);
         RecipeModifier.applyEffectAgents(formula, req.effects(), intensity, req.color(), req.secondaryColor(), tempC, req.atmosphere());
         RecipeModifier.applyFeldsparSubstitution(formula, req.feldsparSubstitute());
-        RecipeModifier.applyFoodSafetyAdjustments(formula, req.foodSafe());
+        Map<String, Double> foodSafeLimits = RecipeModifier.applyFoodSafetyAdjustments(formula, req.foodSafe());
         RecipeMath.normalize(formula);
+        foodSafeLimits.keySet().retainAll(formula.keySet());
 
         String label = labelled ? route.name() + " · " + meltVariant : route.name();
         return new RecipeSuggestion(
@@ -89,6 +90,7 @@ public class GlazeRecipeService {
                 // same analysis the Recipe Builder runs, so previews agree across the handoff
                 GlazeAnalyzer.analyze(formula, tempC, req.atmosphere()).properties(),
                 FiringScheduleBuilder.buildAll(meltVariant, req, formula),
-                new RecipeRoute(route.name(), route.summary(), route.signature()));
+                new RecipeRoute(route.name(), route.summary(), route.signature()),
+                foodSafeLimits);
     }
 }
