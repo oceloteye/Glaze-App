@@ -95,6 +95,34 @@ class RecipeControllerTest {
                 .andExpect(status().isOk());
     }
 
+    @Test
+    void previewReturnsLeadRecipeIngredientsAndRoute() throws Exception {
+        String body = """
+                {"color":"#3a6bc1","firingTempC":1220,"surfaceFinish":"Satin","stability":"Medium",
+                 "effects":[],"intensity":50,"hueFamily":"blue","saturation":60,"depth":50}
+                """;
+
+        mockMvc.perform(post("/api/recipes/preview")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.ingredients").isMap())
+                .andExpect(jsonPath("$.route.name").value("Cobalt"));
+    }
+
+    @Test
+    void previewRejectsUnknownHueFamilyCharacters() throws Exception {
+        String body = """
+                {"color":"#3a6bc1","firingTempC":1220,"surfaceFinish":"Satin","stability":"Medium",
+                 "effects":[],"intensity":50,"hueFamily":"Blue!","saturation":60,"depth":50}
+                """;
+
+        mockMvc.perform(post("/api/recipes/preview")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest());
+    }
+
     // ── Validation rejections ─────────────────────────────────────────────────
 
     @Test

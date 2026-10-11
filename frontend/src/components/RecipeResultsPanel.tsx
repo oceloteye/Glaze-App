@@ -76,7 +76,24 @@ function IngredientName({ name }: { name: string }) {
   )
 }
 
-function IngredientGroup({ title, entries }: { title: string; entries: IngredientEntry[] }) {
+function FoodSafeFlag({ kept }: { kept: number }) {
+  const title = `Dinnerware mode cut this to ${Math.round(kept * 100)}% of the dose the colour asked for, to limit leaching. Turn food safe off for the full colour.`
+  return (
+    <span className="food-safe-flag" title={title} aria-label={title}>
+      food-safe limit
+    </span>
+  )
+}
+
+function IngredientGroup({
+  title,
+  entries,
+  foodSafeLimits,
+}: {
+  title: string
+  entries: IngredientEntry[]
+  foodSafeLimits?: Record<string, number>
+}) {
   if (entries.length === 0) return null
   return (
     <div className="ingredient-group">
@@ -87,7 +104,10 @@ function IngredientGroup({ title, entries }: { title: string; entries: Ingredien
       <ul>
         {entries.map(([ingredient, percent]) => (
           <li key={ingredient}>
-            <IngredientName name={ingredient} />
+            <span className="ingredient-cell">
+              <IngredientName name={ingredient} />
+              {foodSafeLimits?.[ingredient] !== undefined && <FoodSafeFlag kept={foodSafeLimits[ingredient]} />}
+            </span>
             <span>{percent.toFixed(2)}%</span>
           </li>
         ))}
@@ -236,8 +256,8 @@ export function RecipeResultsPanel({ composer }: Props) {
                   </div>
                   <RecipeThumb recipe={recipe} context={previewContext} />
                 </div>
-                <IngredientGroup title="Base glaze" entries={base} />
-                <IngredientGroup title="Colorants & additives" entries={colorants} />
+                <IngredientGroup title="Base glaze" entries={base} foodSafeLimits={recipe.foodSafeLimits} />
+                <IngredientGroup title="Colorants & additives" entries={colorants} foodSafeLimits={recipe.foodSafeLimits} />
                 {recipe.umf && <UmfSection umf={recipe.umf} />}
                 {schedule && (
                   <FiringScheduleSection
