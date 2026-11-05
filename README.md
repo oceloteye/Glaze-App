@@ -1,6 +1,11 @@
 # Glaze Lab
 
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
+[![CI](https://github.com/oceloteye/Glaze-App/actions/workflows/ci.yml/badge.svg)](https://github.com/oceloteye/Glaze-App/actions/workflows/ci.yml)
+
 Full-stack web app of ceramic glaze tools. The **Recipe Generator** drafts candidate glaze recipes from user-selected parameters, and the **Recipe Builder** lets you assemble a recipe from raw materials with sliders and see the predicted result, chemistry and safety notes update live.
+
+> **Safety notice.** Every recipe, colour prediction, UMF value and "food-safe" indication produced by this software is a calculated starting point, not a tested result. Glazes must be fired on test tiles in your own kiln, and anything intended for food or drink surfaces must be leach-tested before use. Many glaze materials are hazardous to handle — read the supplier safety data sheets and use dust and skin protection. See [NOTICE](NOTICE).
 
 ## Tech Stack
 
@@ -15,7 +20,7 @@ Full-stack web app of ceramic glaze tools. The **Recipe Generator** drafts candi
 ## Features
 
 - Parameter form for:
-  - Color goal (hex) with live canvas preview of the fired glaze
+  - Colour palette: pick a hue family (celadon, tenmoku, cobalt blue, chrome-tin wine, …) and tune it with **saturation** (muted → pure) and **depth** (light → deep) sliders; a swatch shows the colour the chemistry is predicted to give. Families that need an inclusion stain (bright red, orange, yellow, magenta) are shown greyed out until stain support lands
   - Firing temperature (°C / cone)
   - Surface finish (Matte / Satin / Glossy)
   - Melt / stability (Stiff / Balanced / Fluid)
@@ -25,6 +30,7 @@ Full-stack web app of ceramic glaze tools. The **Recipe Generator** drafts candi
 - API endpoint to generate recipe candidates
 - Ingredient percentages normalized to 100%
 - Rationale, UMF analysis and firing schedules for each generated recipe
+- Food-safe mode caps leach-prone colourants and flags each ingredient it reduced on the recipe card
 - Recipe Builder: pick from 38 catalogued materials, set amounts in parts with sliders or number inputs (auto-normalised to 100%), choose cone and atmosphere, and get a live predicted tile, property meters (melt, gloss, opacity, durability, thermal expansion), the unity molecular formula and grouped notes covering melt/maturity, glaze fit, application defects, food safety and handling/toxicity
 - Responsive UI for desktop and mobile
 - Pages: Home (`/`), Recipe Generator (`/generator`) and Recipe Builder (`/builder`), with client-side routing; the backend forwards unknown non-API paths to `index.html` so deep links work
@@ -34,16 +40,21 @@ Full-stack web app of ceramic glaze tools. The **Recipe Generator** drafts candi
 Endpoints:
 
 - `POST /api/recipes/generate` — draft recipes from target parameters
+- `POST /api/recipes/preview` — the lead recipe's ingredients and colour route for the same parameters (used for the live swatch)
 - `GET /api/materials` — the material catalogue used by the Recipe Builder
 - `POST /api/recipes/analyze` — analyse a user-built recipe
+- `GET /api/health` — liveness check
 
 ### `POST /api/recipes/generate`
 
-Sample request body (`opacity`, `intensity`, `secondaryColor`, `feldsparSubstitute`, `colorCharacter`, `atmosphere` and `foodSafe` are optional):
+Sample request body (`opacity`, `intensity`, `secondaryColor`, `feldsparSubstitute`, `colorCharacter`, `atmosphere`, `foodSafe`, `hueFamily`, `saturation` and `depth` are optional):
 
 ```json
 {
   "color": "#7f9e87",
+  "hueFamily": "green",
+  "saturation": 40,
+  "depth": 50,
   "firingTempC": 1222,
   "surfaceFinish": "Satin",
   "stability": "Low",
@@ -55,7 +66,7 @@ Sample request body (`opacity`, `intensity`, `secondaryColor`, `feldsparSubstitu
 }
 ```
 
-`stability` accepts `High` / `Medium` / `Low` (shown in the UI as Stiff / Balanced / Fluid).
+`stability` accepts `High` / `Medium` / `Low` (shown in the UI as Stiff / Balanced / Fluid). When `hueFamily` is present it selects the colourant system directly and `saturation` / `depth` (0–100, default 50) position the colour within that family; otherwise the colourant system is inferred from the hex `color`.
 
 Sample response shape:
 
@@ -72,9 +83,23 @@ Sample response shape:
       },
       "rationale": "High-fire Potash Feldspar base — silica and kaolin provide the glass network. Balanced flux-silica-alumina ratio for reliable results across a range of kilns. Fluid melt target: Lithium Carbonate and Wollastonite raise flux activity so the glaze moves and pools. Zircopax and Tin Oxide opacify the glaze to a dense, covering surface.",
       "umf": { "...": "unity molecular formula analysis" },
-      "firingSchedules": [{ "...": "segments for very short / short / standard / slow schedules" }]
+      "firingSchedules": [{ "...": "segments for very short / short / standard / slow schedules" }],
+      "foodSafeLimits": { "Copper Carbonate": 0.45 }
     }
   ]
+}
+```
+
+`foodSafeLimits` lists colourants that food-safe mode scaled back, mapped to the fraction of the requested dose that was kept. It is empty when `foodSafe` is false or nothing was reduced.
+
+### `POST /api/recipes/preview`
+
+Takes the same body as `/generate` and returns only the lead recipe's normalised ingredients plus the colour route that produced them:
+
+```json
+{
+  "ingredients": { "Potash Feldspar": 30.1, "Silica": 24.0, "Cobalt Carbonate": 0.6 },
+  "route": { "name": "Cobalt", "summary": "...", "signature": ["Cobalt Carbonate"] }
 }
 ```
 
@@ -155,7 +180,10 @@ Frontend:
 ```powershell
 Set-Location .\frontend
 npm.cmd run build
+npx.cmd vitest run
 ```
+
+The same checks run on every pull request via `.github/workflows/ci.yml`.
 
 ## Deploy
 
@@ -241,6 +269,16 @@ Free-tier caveats: the service spins down after ~15 minutes without traffic and 
 ### Separate containers
 
 `backend/Dockerfile` and `frontend/Dockerfile` (nginx proxying `/api/` to `BACKEND_HOST:8080`) remain for hosts where two services can talk over a private network. Set `CORS_ALLOWED_ORIGINS` on the backend if the frontend is served from a different origin without a proxy.
+
+## Contributing
+
+Bug reports, test-tile results and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow and [SECURITY.md](SECURITY.md) for reporting vulnerabilities. This project follows the [Contributor Covenant](CODE_OF_CONDUCT.md).
+
+## License
+
+Copyright (C) 2025 EC.
+
+Glaze Lab is free software, released under the [GNU Affero General Public License v3.0 or later](LICENSE). You may run, study, modify and share it; if you run a modified version as a network service you must offer its source to the users of that service. Material data and glaze chemistry heuristics in this repository are provided without warranty of any kind — see [NOTICE](NOTICE).
 
 ## Notes
 

@@ -1,0 +1,39 @@
+name: Bug report
+description: Something in the app or API is broken
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Recipe Generator (UI)
+        - Recipe Builder (UI)
+        - Backend API
+        - Build / CI / Docker
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: params
+    attributes:
+      label: Parameters or request
+      description: For generator bugs paste the form settings (hue family, saturation, depth, cone, finish, melt, opacity, atmosphere, food-safe, effects) or the JSON request body. For builder bugs paste the recipe parts and cone.
+      render: json
+  - type: input
+    id: env
+    attributes:
+      label: Environment
+      placeholder: e.g. Chrome 130 on Windows, or local build at commit abc1234
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: Screenshots, console errors, stack traces.

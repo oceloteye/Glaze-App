@@ -1,0 +1,40 @@
+name: Glaze result
+description: You fired a generated recipe — tell us what actually came out of the kiln
+labels: [glaze-result]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Real test-tile results are the best feedback this project can get. Thank you.
+  - type: textarea
+    id: recipe
+    attributes:
+      label: Recipe as generated
+      description: Paste the ingredient list (or the JSON request + response) exactly as the app gave it to you.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: firing
+    attributes:
+      label: Firing
+      description: Cone / peak temperature, atmosphere, hold, cooling rate, kiln type, clay body.
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: What you got
+      description: Colour, surface, opacity, melt behaviour, defects (crawl, pinholes, crazing, running). How did it compare with the predicted swatch and property meters?
+    validations:
+      required: true
+  - type: textarea
+    id: photos
+    attributes:
+      label: Photos
+      description: Drag and drop photos of the tile(s), ideally in daylight next to something with known colour.
+  - type: textarea
+    id: changes
+    attributes:
+      label: Adjustments you would suggest
+      description: Optional. If you corrected the recipe to get a better result, what did you change?
