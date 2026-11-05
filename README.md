@@ -276,7 +276,7 @@ Bug reports, test-tile results and pull requests are welcome. See [CONTRIBUTING.
 
 ## License
 
-Copyright (C) 2025 EC.
+Copyright (C) 2025 Glaze Lab contributors.
 
 Glaze Lab is free software, released under the [GNU Affero General Public License v3.0 or later](LICENSE). You may run, study, modify and share it; if you run a modified version as a network service you must offer its source to the users of that service. Material data and glaze chemistry heuristics in this repository are provided without warranty of any kind — see [NOTICE](NOTICE).
 
