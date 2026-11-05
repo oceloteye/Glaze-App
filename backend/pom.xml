@@ -21,16 +21,9 @@
 			<distribution>repo</distribution>
 		</license>
 	</licenses>
-	<developers>
-		<developer>
-			<id>oceloteye</id>
-			<name>EC</name>
-			<url>https://github.com/oceloteye</url>
-		</developer>
-	</developers>
 	<scm>
 		<connection>scm:git:https://github.com/oceloteye/Glaze-App.git</connection>
-		<developerConnection>scm:git:git@github.com:oceloteye/Glaze-App.git</developerConnection>
+		<developerConnection>scm:git:https://github.com/oceloteye/Glaze-App.git</developerConnection>
 		<tag>HEAD</tag>
 		<url>https://github.com/oceloteye/Glaze-App</url>
 	</scm>
