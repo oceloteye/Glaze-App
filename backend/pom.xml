@@ -13,18 +13,19 @@
 	<version>0.0.1-SNAPSHOT</version>
 	<name>glaze-backend</name>
 	<description>Ceramic glaze recipe generator</description>
-	<url/>
+	<url>https://github.com/oceloteye/Glaze-App</url>
 	<licenses>
-		<license/>
+		<license>
+			<name>GNU Affero General Public License v3.0 or later</name>
+			<url>https://www.gnu.org/licenses/agpl-3.0.txt</url>
+			<distribution>repo</distribution>
+		</license>
 	</licenses>
-	<developers>
-		<developer/>
-	</developers>
 	<scm>
-		<connection/>
-		<developerConnection/>
-		<tag/>
-		<url/>
+		<connection>scm:git:https://github.com/oceloteye/Glaze-App.git</connection>
+		<developerConnection>scm:git:https://github.com/oceloteye/Glaze-App.git</developerConnection>
+		<tag>HEAD</tag>
+		<url>https://github.com/oceloteye/Glaze-App</url>
 	</scm>
 	<properties>
 		<java.version>25</java.version>

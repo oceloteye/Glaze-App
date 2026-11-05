@@ -1,0 +1,47 @@
+Glaze Lab
+Copyright (C) 2025 Glaze Lab contributors
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+------------------------------------------------------------------------
+
+CERAMIC SAFETY NOTICE
+
+Glaze Lab calculates glaze recipes, unity molecular formulas, colour
+predictions, property estimates and "food-safe" adjustments from
+published material analyses and simplified chemistry heuristics. These
+outputs are untested starting points for your own experiments. They are
+not laboratory results and must not be relied on as such.
+
+  * Fire every recipe on test tiles in your own kiln before using it on
+    work. Results depend on your materials, clay body, kiln, firing
+    schedule and atmosphere.
+
+  * The food-safe mode only limits the amount of certain colourants. It
+    cannot verify that a fired glaze is safe for surfaces that contact
+    food or drink. Any such surface must be leach-tested (for example to
+    ASTM C738 / ISO 6486 or an equivalent standard) before use.
+
+  * Many raw glaze materials are hazardous to handle: silica dust,
+    manganese, cobalt, chromium, copper, barium, lithium and others.
+    Follow your supplier's safety data sheets and local regulations;
+    use respiratory, eye and skin protection.
+
+  * Material analyses are nominal supplier values and vary from batch
+    to batch.
+
+To the fullest extent permitted by law, the authors and contributors
+accept no liability for injury, property damage or loss arising from the
+use of this software or anything made with its output. Sections 15 and
+16 of the GNU Affero General Public License apply.

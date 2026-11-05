@@ -1,0 +1,22 @@
+name: Feature request
+description: Suggest a new capability or change
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: Describe the situation from a potter's or developer's point of view.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+    validations:
+      required: true
+  - type: textarea
+    id: references
+    attributes:
+      label: References
+      description: Glaze chemistry sources, published recipes, or other software that does this well.
