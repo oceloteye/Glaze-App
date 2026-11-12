@@ -1,6 +1,6 @@
 # Glaze Lab
 
-[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![CI](https://github.com/oceloteye/Glaze-App/actions/workflows/ci.yml/badge.svg)](https://github.com/oceloteye/Glaze-App/actions/workflows/ci.yml)
 
 Full-stack web app of ceramic glaze tools. The **Recipe Generator** drafts candidate glaze recipes from user-selected parameters, and the **Recipe Builder** lets you assemble a recipe from raw materials with sliders and see the predicted result, chemistry and safety notes update live.
@@ -278,7 +278,7 @@ Bug reports, test-tile results and pull requests are welcome. See [CONTRIBUTING.
 
 Copyright (C) 2025 Glaze Lab contributors.
 
-Glaze Lab is free software, released under the [GNU Affero General Public License v3.0 or later](LICENSE). You may run, study, modify and share it; if you run a modified version as a network service you must offer its source to the users of that service. Material data and glaze chemistry heuristics in this repository are provided without warranty of any kind — see [NOTICE](NOTICE).
+Glaze Lab is open source under the [Apache License, Version 2.0](LICENSE). You may use, modify, distribute and host it, including in commercial and closed products, provided you keep the license and the attribution in [NOTICE](NOTICE). Material data and glaze chemistry heuristics in this repository are provided without warranty of any kind — see [NOTICE](NOTICE).
 
 ## Notes
 

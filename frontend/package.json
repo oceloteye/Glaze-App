@@ -2,7 +2,7 @@
   "name": "glaze-lab-frontend",
   "private": true,
   "version": "0.0.0",
-  "license": "AGPL-3.0-or-later",
+  "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/oceloteye/Glaze-App.git",

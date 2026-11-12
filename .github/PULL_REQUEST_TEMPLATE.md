@@ -23,4 +23,4 @@ Have you fired it? If so, cone / atmosphere / result:
 - [ ] `npx tsc -b`, `npx eslint src` and `npx vitest run` pass (frontend)
 - [ ] Tests added or updated for the change
 - [ ] README updated if the public API or user-facing behaviour changed
-- [ ] I agree that my contribution is licensed under the AGPL-3.0-or-later like the rest of the project
+- [ ] I agree that my contribution is licensed under the Apache License 2.0 like the rest of the project
