@@ -1,6 +1,6 @@
 # Copilot instructions for Glaze Lab
 
-Glaze Lab is a ceramic glaze recipe generator: a Spring Boot API in `backend/` and a React + Vite + TypeScript client in `frontend/`. It is licensed under AGPL-3.0-or-later; keep that in mind when suggesting third-party code.
+Glaze Lab is a ceramic glaze recipe generator: a Spring Boot API in `backend/` and a React + Vite + TypeScript client in `frontend/`. It is licensed under Apache-2.0; keep that in mind when suggesting third-party code.
 
 ## Working in this repo
 

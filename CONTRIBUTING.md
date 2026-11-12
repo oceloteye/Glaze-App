@@ -2,7 +2,7 @@
 
 Thanks for your interest. Bug reports, kiln results from real test tiles, chemistry corrections and code are all welcome.
 
-By contributing you agree that your contribution is licensed under the [GNU AGPL v3.0 or later](LICENSE), the same license as the project, and that you follow the [Code of Conduct](CODE_OF_CONDUCT.md).
+By contributing you agree that your contribution is licensed under the [Apache License 2.0](LICENSE), the same license as the project, and that you follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Ways to help
 
