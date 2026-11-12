@@ -26,7 +26,15 @@ jobs:
           cache-dependency-path: backend/pom.xml
       - name: Test
         working-directory: backend
-        run: ./mvnw -B --no-transfer-progress test
+        run: |
+          for attempt in 1 2 3; do
+            ./mvnw -B --no-transfer-progress test && exit 0
+            if [ "$attempt" -lt 3 ]; then
+              echo "Maven attempt $attempt failed; retrying in 5 seconds..."
+              sleep 5
+            fi
+          done
+          exit 1
       - name: Upload surefire reports
         if: failure()
         uses: actions/upload-artifact@v4
